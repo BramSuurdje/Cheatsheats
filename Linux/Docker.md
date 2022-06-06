@@ -34,3 +34,25 @@ sudo apt-get install docker-ce docker-ce-cli containerd.io docker-compose-plugin
 ```bash
 sudo docker run hello-world
 ```
+
+# Docker Compose Install Guide
+
+### Download the latest Docker-Compose version
+```bash
+sudo curl -L https://github.com/docker/compose/releases/download/v2.0.1/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
+```
+
+# Make the binary file executable.
+```bash
+chmod +x docker-compose-linux-x86_64
+```
+
+# Move the file to your PATH
+```bash
+sudo mv docker-compose-linux-x86_64 /usr/local/bin/docker-compose
+```
+
+# Confirm that docker-compose has been installed
+```bash
+docker-compose version
+```
