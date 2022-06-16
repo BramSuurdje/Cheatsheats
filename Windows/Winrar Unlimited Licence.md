@@ -21,4 +21,4 @@ aef69d48c864bcd72d15163897773d314187f6a9af350808719796
 
 After that. Save the file as ```rarreg.key```
 
-Now Copy the newly created "rarreg.key" file and paste it in the folder where winrar is located, the easyest way to find this is to seach for winrar, and then clicking on "open file location" and wher you enter that folder, click on "open file location once again.
+Now Copy the newly created "rarreg.key" file and paste it in the folder where winrar is located, the easiest way to find this is to seach for winrar, and then clicking on "open file location" and wher you enter that folder, click on "open file location once again.
