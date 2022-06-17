@@ -13,7 +13,7 @@ Initialize the $OVPN_DATA container that will hold the configuration files and c
 docker volume create --name $OVPN_DATA
 docker run -v $OVPN_DATA:/etc/openvpn --rm kylemanna/openvpn ovpn_genconfig -u udp://VPN.SERVERNAME.COM 
 ~~~
-MAKE SURE YOU REPLACE "VPN.SERVERNAME.COM" WITH YOUR OWN GENERATED DUCKDNS NAME ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
+make sure you update VPN.SERVERNAME.COM with your own generated duckdns name!
 ~~~
 docker run -v $OVPN_DATA:/etc/openvpn --rm -it kylemanna/openvpn ovpn_initpki
 ~~~
