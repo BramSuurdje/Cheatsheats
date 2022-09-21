@@ -13,7 +13,7 @@ choco install winscp -y
 choco install sharex -y
 choco install adobereader -y
 choco install microsoft-teams -y
-choco install office-tool -y
 choco install winrar -y
 choco install python -y
+choco install office365business -y
 ```
