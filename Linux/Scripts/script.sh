@@ -2,6 +2,12 @@
 # Gemaakt door Bram Suurd
 # 134587@student.drenthecollege.nl
 
+if [ "$USER" != "root" ]
+then
+    echo "Voer dit uit als root of met sudo"
+    exit 2
+fi
+
 DIALOG_INSTALLED=$(dpkg-query -W --showformat='${Status}\n' dialog|grep "install ok installed")
 
 if [ "$DIALOG_INSTALLED" == "" ]; then
