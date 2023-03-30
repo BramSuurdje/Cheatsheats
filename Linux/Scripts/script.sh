@@ -12,8 +12,8 @@ DIALOG_INSTALLED=$(dpkg-query -W --showformat='${Status}\n' dialog|grep "install
 
 if [ "$DIALOG_INSTALLED" == "" ]; then
   echo "Dialog is niet geïnstalleerd, nu installeren ..."
-  apt-get update
-  apt-get install -y dialog
+  apt-get update > /dev/null 2>&1
+  apt-get install -y dialog > /dev/null 2>&1
 fi
 
 MariaDB_Installeren_Configureren() {
