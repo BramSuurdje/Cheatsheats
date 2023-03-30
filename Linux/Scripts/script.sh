@@ -129,38 +129,51 @@ Post_Install() {
 }
 
 Gebruikers_Toevoegen() {
-    #!/bin/bash
 
-    # Vraag de gebruiker om het personeelsnummer
+    echo "voer de naam van de nieuwe gebruiker in"
+    read naam
     echo "Voer het personeelsnummer in:"
     read personeelsnummer
     echo "Voer de juiste Afdeling in:"
     echo "De afdelingen zijn"
     echo "Administratie"
     echo "Directie"
-    echo "
+    echo "Verkoop"
+    echo "-------------------"
     read personeelsafdeling
 
-    # Genereer een wachtwoord met behulp van een rekensom en willekeurige letters en tekens
+groups=("Administratie" "Directie" "Verkoop") 
+
+occ="/var/www/html/nextcloud/occ"
+
+for group in "${groups[@]}"
+do
+    if grep -q "^$group:" /etc/group; then
+        echo "Group $group already exists"
+    else
+        echo "Group $group does not exist, creating it..."
+        groupadd "$group"
+        sudo -u www-data php "$occ" group:create "$group"
+        echo "Group $group created"
+    fi
+done
+
+
     wachtwoord=$(echo "($personeelsnummer*3)+5" | bc)$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 3 | head -n 1)'!'$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 2 | head -n 1)'#'
 
-    # Maak een nieuwe gebruiker aan met het personeelsnummer als inlognaam en het gegenereerde wachtwoord
     useradd -m -d /home/$personeelsnummer -s /bin/bash -p $(echo $wachtwoord | openssl passwd -1 -stdin) $personeelsnummer
 
-    # Voeg de gebruiker toe aan de juiste groep (afdeling)
-    groupadd $personeelsafdeling
     usermod -aG $personeelsafdeling $personeelsnummer
 
-    # Voeg de gebruiker toe aan Nextcloud
-    occ="path/to/occ"
-    sudo -u www-data php $occ user:add --display-name "$personeelsnummer" --password "$wachtwoord" "$personeelsnummer"
+    export OC_PASS="$wachtwoord"
+    sudo -u www-data php $occ user:add --display-name $naam --password "$wachtwoord" "$personeelsnummer"
 
-    echo "Gebruiker $personeelsnummer is aangemaakt met wachtwoord $wachtwoord en toegevoegd aan de groep $afdeling en Nextcloud."
+    echo "Gebruiker $naam is aangemaakt met de inlognaam $personeelsnummer, met wachtwoord $wachtwoord en toegevoegd aan de groep $personeelsafdeling"
 }
 
 HEIGHT=15
 WIDTH=60
-CHOICE_HEIGHT=4
+CHOICE_HEIGHT=6
 BACKTITLE="Bram Suurd 134587"
 TITLE="Linux Drenthecollege"
 MENU="Kies een van de volgende opties:"
