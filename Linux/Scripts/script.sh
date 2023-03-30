@@ -128,6 +128,36 @@ Post_Install() {
   echo "WordPress URL: http://${SERVER_IP}/wordpress/"
 }
 
+Gebruikers_Toevoegen() {
+    #!/bin/bash
+
+    # Vraag de gebruiker om het personeelsnummer
+    echo "Voer het personeelsnummer in:"
+    read personeelsnummer
+    echo "Voer de juiste Afdeling in:"
+    echo "De afdelingen zijn"
+    echo "Administratie"
+    echo "Directie"
+    echo "
+    read personeelsafdeling
+
+    # Genereer een wachtwoord met behulp van een rekensom en willekeurige letters en tekens
+    wachtwoord=$(echo "($personeelsnummer*3)+5" | bc)$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 3 | head -n 1)'!'$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 2 | head -n 1)'#'
+
+    # Maak een nieuwe gebruiker aan met het personeelsnummer als inlognaam en het gegenereerde wachtwoord
+    useradd -m -d /home/$personeelsnummer -s /bin/bash -p $(echo $wachtwoord | openssl passwd -1 -stdin) $personeelsnummer
+
+    # Voeg de gebruiker toe aan de juiste groep (afdeling)
+    groupadd $personeelsafdeling
+    usermod -aG $personeelsafdeling $personeelsnummer
+
+    # Voeg de gebruiker toe aan Nextcloud
+    occ="path/to/occ"
+    sudo -u www-data php $occ user:add --display-name "$personeelsnummer" --password "$wachtwoord" "$personeelsnummer"
+
+    echo "Gebruiker $personeelsnummer is aangemaakt met wachtwoord $wachtwoord en toegevoegd aan de groep $afdeling en Nextcloud."
+}
+
 HEIGHT=15
 WIDTH=60
 CHOICE_HEIGHT=4
@@ -138,7 +168,8 @@ MENU="Kies een van de volgende opties:"
 OPTIONS=(1 "Alle Scripts Uitvoeren"
          2 "Specifieke Scripts Uitvoeren"
          3 "Alle web links laten zien"
-         4 "Exit")
+         4 "Gebruikers Toevoegen"
+         5 "Exit")
 
 while true; do
     CHOICE=$(dialog --clear \
@@ -149,11 +180,11 @@ while true; do
                     "${OPTIONS[@]}" \
                     2>&1 >/dev/tty)
 
-    if [[ $CHOICE =~ ^[1-4]$ ]]; then
+    if [[ $CHOICE =~ ^[1-5]$ ]]; then
         clear
         break
     else
-        echo "Ongeldige invoer. Voer een getal in tussen 1 en 4."
+        echo "Ongeldige invoer. Voer een getal in tussen 1 en 5."
     fi
 
 done
@@ -231,7 +262,10 @@ case $CHOICE in
         Post_Install
         ;;
     4)
-        exit 0
+        Gebruikers_Toevoegen
+        ;;
+    5)
+        exit
         ;;
     *)
         echo "Ongeldige optie geselecteerd. Probeer het opnieuw."
