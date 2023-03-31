@@ -66,5 +66,5 @@ sudo lsblk
 ```bash
 wget https://raw.githubusercontent.com/br4mSuurd/Cheatsheats/main/Linux/Scripts/script.sh
 chmod +x script.sh
-sudo script.sh
+sudo ./script.sh
 ```
