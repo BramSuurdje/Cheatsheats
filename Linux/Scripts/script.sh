@@ -359,6 +359,3 @@ case $CHOICE in
         echo "Ongeldige optie geselecteerd. Probeer het opnieuw."
         ;;
 esac
-
-echo "Druk op Enter om door te gaan..."
-read
