@@ -22,7 +22,7 @@ MariaDB_Installeren_Configureren() {
     wget -O /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg
     echo "deb https://packages.sury.org/php/ $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/php.list >/dev/null
     apt update -y
-    required_packages=("apache2" "mariadb-server" "curl" "php8.1" "libapache2-mod-php8.1" "php8.1-gd" "php8.1-mysql" "php8.1-curl" "php8.1-mbstring" "php8.1-intl" "php8.1-imagick" "php8.1-xml" "php8.1-zip")
+    required_packages=("apache2" "mariadb-server" "curl" "php" "libapache2-mod-php" "php-gd" "php-mysql" "php-curl" "php-mbstring" "php-intl" "php-imagick" "php-xml" "php-zip")
     for package in "${required_packages[@]}"; do
         if ! dpkg -s "$package" >/dev/null 2>&1; then
             apt-get install -y "$package"
