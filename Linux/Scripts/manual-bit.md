@@ -42,11 +42,11 @@ sudo nano /etc/fstab
 ##### in deze file zetten we de volgende lines
 ```bash
 # /data
-UUID=ea0d7b33-0fe8-47c4-ab4a-2f00733a2dcf /data	ext4	defaults	0	2
+UUID=ea0d7b33-0fe8-47c4-ab4a-2f00733a2dcf /data	ext4  defaults  0 2
 # /ftp
-UUID=20606b0d-e633-4b23-b713-7d312a6c6517 /ftp 	ext4 defaults 	0 	2
+UUID=20606b0d-e633-4b23-b713-7d312a6c6517 /ftp 	ext4  defaults  0 2
 # /back
-UUID=20606b0d-e633-4b23-b713-7d312a6c6517 /back ext4 defaults 	0 	2
+UUID=20606b0d-e633-4b23-b713-7d312a6c6517 /back ext4  defaults  0 2
 ```
 ## De UUID hierboven is bedoeld als voorbeeld! Kopieer hier de UUID die je in de vorige stap hebt achterhaald. Tussen de UUID-code en de mount (/data en /back) druk je 1x de <SPATIEBALK> in. Na de mount (/data en /back) moet je de <TAB>-toets gebruiken om de opties gescheiden te houden. Wanneer je de <SPATIEBALK> gebruikt krijg je een error.
 
