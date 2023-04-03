@@ -12,8 +12,8 @@ DIALOG_INSTALLED=$(dpkg-query -W --showformat='${Status}\n' dialog|grep "install
 
 if [ "$DIALOG_INSTALLED" == "" ]; then
   echo "Dialog is niet geïnstalleerd, nu installeren ..."
-  apt-get update > /dev/null 2>&1
-  apt-get install -y dialog > /dev/null 2>&1
+  apt-get update 
+  apt-get install -y dialog 
 fi
 
 function Dependencies_Installeren() {
@@ -22,7 +22,7 @@ function Dependencies_Installeren() {
         return 0
     fi
 
-    echo "Voeg ondrej/php PPA toe en werk de package lists bij"
+    echo "Voeg ondrej/php PPA toe en werk de package lists bij..."
     apt-get install -y gnupg2 gnupg ca-certificates curl 
     wget -O /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg
     echo "deb https://packages.sury.org/php/ $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/php.list >/dev/null
@@ -35,7 +35,8 @@ function Dependencies_Installeren() {
     done
 
     touch /tmp/dependencies-installed
-}
+} 
+
 
 function MariaDB_Configureren() {
     systemctl restart apache2
@@ -44,6 +45,12 @@ function MariaDB_Configureren() {
     clear
     echo "Wat moet het wachtwoord worden van de databases?"
     read db_password
+
+    nextcloud_dbuser="nextcloud"
+    nextcloud_dbname="nextcloud"
+    wordpress_dbuser="wordpress"
+    wordpress_dbname="wordpress"
+
 
     mysql -u root -p$db_password << EOF
     ALTER USER 'root'@'localhost' IDENTIFIED BY '$db_password';
@@ -55,18 +62,25 @@ function MariaDB_Configureren() {
 EOF
 
     mysql -u root -p$db_password << EOF
-    CREATE DATABASE IF NOT EXISTS nextcloud;
-    CREATE USER IF NOT EXISTS 'nextcloud'@'localhost' IDENTIFIED BY '$db_password';
-    GRANT ALL PRIVILEGES ON nextcloud.* TO 'nextcloud'@'localhost';
-    CREATE DATABASE IF NOT EXISTS wordpress;
-    CREATE USER IF NOT EXISTS 'wordpress'@'localhost' IDENTIFIED BY '$db_password';
-    GRANT ALL PRIVILEGES ON wordpress.* TO 'wordpress'@'localhost';
+    CREATE DATABASE IF NOT EXISTS $nextcloud_dbname;
+    CREATE USER IF NOT EXISTS '$nextcloud_dbuser'@'localhost' IDENTIFIED BY '$db_password';
+    GRANT ALL PRIVILEGES ON $nextcloud_dbname.* TO '$nextcloud_dbname'@'localhost';
+    CREATE DATABASE IF NOT EXISTS $wordpress_dbname;
+    CREATE USER IF NOT EXISTS '$wordpress_dbuser'@'localhost' IDENTIFIED BY '$db_password';
+    GRANT ALL PRIVILEGES ON $wordpress_dbname.* TO '$wordpress_dbuser'@'localhost';
     FLUSH PRIVILEGES;
 EOF
 }
 
 
 function Nextcloud_Installeren() {
+    NEXTCLOUD_PATH=/var/www/html/nextcloud
+
+    if [ -d "$NEXTCLOUD_PATH" ]; then
+        echo "Nextcloud is al geïnstalleerd."
+        return 0
+    fi
+
     echo "Nextcloud downloaden..."
     if [ -e latest.tar.bz2 ]; then
         echo "Nextcloud is al gedownload, downloaden wordt overgeslagen."
@@ -80,7 +94,7 @@ function Nextcloud_Installeren() {
     echo "Regels instellen voor de Nextcloud-directory..."
     chown -R www-data:www-data "$NEXTCLOUD_PATH"
     chmod -R u+rwX,g+rX,o+rX "$NEXTCLOUD_PATH"
-    chown www-data:www-data "$NEXTCLOUD_PATH"
+    chown -R www-data:www-data /data
 
     echo "Apache virtuele host configureren voor Nextcloud..."
     DEFAULT_CONF=/etc/apache2/sites-available/000-default.conf
@@ -96,11 +110,6 @@ function Nextcloud_Installeren() {
     else
         echo "Er is iets fout gegaan bij het configureren van Apache voor Nextcloud."
     fi
-    wget -P /tmp https://rtvslos.nl/rtv/wp-content/uploads/2021/04/vlaggen-Drenthe-Collegekopie.jpg
-    sudo -u www-data php /var/www/html/nextcloud/occ theming:config background /tmp/vlaggen-Drenthe-Collegekopie.jpg
-    wget -P /tmp https://www.drenthecollege.nl/media/20ccfy31/dc_logo_2014_cmyk-zonderafloop.png
-    sudo -u www-data php /var/www/html/nextcloud/occ theming:config logo /tmp/dc_logo_2014_cmyk-zonderafloop.png
-    sudo -u www-data php /var/www/html/nextcloud/occ config:system:set default_language --value="nl"
 }
 
 
@@ -134,7 +143,7 @@ function Wordpress_Installeren() {
         echo "Fout bij het herstarten van Apache"
         exit 1
     fi
-}
+} 
 
 
 function Backups_instellen() {
@@ -153,7 +162,7 @@ function Backups_instellen() {
     else
         echo "Error: rsync command failed."
     fi
-}
+} 
 
 
 function Webmin_Installeren() {
@@ -168,11 +177,26 @@ function Webmin_Installeren() {
     echo "$REPO_URL" | tee -a /etc/apt/sources.list
     apt-get update
     apt-get install -y webmin
+} 
+
+function Docker_Installeren() {
+    apt-get update -y
+    apt-get install ca-certificates curl gnupg -y
+    mkdir -m 0755 -p /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    echo \
+    "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
+    "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
+    tee /etc/apt/sources.list.d/docker.list > /dev/null
+    apt-get update -y
+    apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 }
 
 
 function Post_Install() {
     set -e
+
+    clear
 
     WEBMIN_PORT=10000
     SERVER_IP=$(hostname -I | awk '{print $1}')
@@ -184,9 +208,24 @@ function Post_Install() {
     echo "Nextcloud URL: $NEXTCLOUD_URL"
     echo "Webmin URL: $WEBMIN_URL"
     echo "WordPress URL: $WORDPRESS_URL"
+    echo " "
+    echo "Nextcloud DataDirectory: /data"
+    echo "Nextcloud gebruikersnaam: $nextcloud_dbuser"
+    echo "Nextcloud wachtwoord: $db_password"
+    echo "Nextcloud database: $nextcloud_dbname"
+    echo "Nextcloud DatabaseServer: Localhost"
+    echo " "
+    echo "Wordpress database: $wordpress_dbname"
+    echo "Wordpress gebruikersnaam: $wordpress_dbuser"
+    echo "Wordpress wachtwoord: $db_password"
+    echo "Wordpress DatabaseServer: Localhost"
+
 }
 
+
 function Gebruikers_Toevoegen() {
+
+    sudo -u www-data php /var/www/html/nextcloud/occ config:system:set default_language --value="nl"
 
     printf "Voer de naam van de nieuwe gebruiker in: "
     read username
@@ -233,16 +272,16 @@ function Gebruikers_Toevoegen() {
 
     useradd -m -d "/home/$employee_number" -s /bin/bash -p "$hashed_password" "$employee_number"
     usermod -aG "$department" "$employee_number"
-    export OC_PASS=newpassword
-    su -s /bin/sh www-data -c 'php occ user:add --password-from-env --display-name="$username" --group="$department" $employee_number'
+    export OC_PASS=$password
+    su -s /bin/sh www-data -c "php /var/www/html/nextcloud/occ user:add --password-from-env --display-name=\"$username\" --group=\"$department\" \"$employee_number\""
 
     mkdir -p /data/user-accounts && printf "Gebruiker %s is aangemaakt met gebruikersnaam %s, wachtwoord %s, en toegevoegd aan de groep %s\n, het watchwoord voor nextcloud is 'wachtwoord123'" "$username" "$employee_number" "$password" "$department"  | tee -a /data/user-accounts/$employee_number-Wachtwoord.txt
-}
+} 
 
 HEIGHT=15
 WIDTH=60
 CHOICE_HEIGHT=6
-BACKTITLE="Bram Suurd 134587"
+BACKTITLE="Linux Project"
 TITLE="Linux Drenthecollege"
 MENU="Kies een van de volgende opties:"
 
@@ -265,16 +304,16 @@ while true; do
         clear
         break
     else
-        echo "Ongeldige invoer. Voer een getal in tussen 1 en 5."
+        echo "Ongeldige invoer. Voer een getal in tussen 1 en 6."
     fi
 
 done
 
 case $CHOICE in
     1)
-        echo "Dependencies aan het installeren"
+        echo "Dependencies aan het installeren..."
         Dependencies_Installeren || echo "Fout bij het installeren van dependencies"
-        echo "MariaDB aan het Configureren"
+        echo "MariaDB aan het Configureren..."
         MariaDB_Configureren || echo "Fout bij het configureren van Mariadb"
         echo "Nextcloud aan het installeren..."
         Nextcloud_Installeren || echo "Fout bij het installeren van Nextcloud"
@@ -294,8 +333,9 @@ case $CHOICE in
                         2 "Nextcloud Installeren"
                         3 "Wordpress Installeren"
                         4 "Webmin Installeren"
-                        5 "Back-ups Instellen"
-                        6 "Terug naar menu")
+                        5 "Docker Installeren"
+                        6 "Back-ups Instellen"
+                        7 "Terug naar menu")
             SUBCHOICE=$(dialog --clear \
                                --backtitle "$BACKTITLE" \
                                --title "Specifieke Scripts Uitvoeren" \
@@ -334,11 +374,15 @@ case $CHOICE in
                 Webmin_Installeren || echo "Fout bij het installeren van Webmin"
                 ;;
             5)
+                echo "Docker Installeren"
+                Docker_Installeren || echo "Fout bij het installeren van Docker"
+                ;;
+            6)
                 echo "Back-ups instellen..."
                 Dependencies_Installeren || echo "Fout bij het installeren van dependencies"
                 Backups_instellen || echo "Fout bij het instellen van back-ups"
                 ;;
-            6)
+            7)
                 exit 0
                 ;;
             *)
@@ -359,3 +403,37 @@ case $CHOICE in
         echo "Ongeldige optie geselecteerd. Probeer het opnieuw."
         ;;
 esac
+
+
+#
+# Check if phpMyAdmin is already installed
+if dpkg -l phpmyadmin >/dev/null 2>&1; then
+    echo "phpMyAdmin is already installed."
+    exit 0
+fi
+
+# Install required packages
+if ! apt-get update; then
+    echo "Failed to update package index."
+    exit 1
+fi
+
+if ! apt-get install -y phpmyadmin php-mbstring php-zip php-gd php-json php-curl; then
+    echo "Failed to install phpMyAdmin."
+    exit 1
+fi
+
+# Configure phpMyAdmin to use Apache
+if [ ! -f /etc/apache2/conf-available/phpmyadmin.conf ]; then
+    ln -s /etc/phpmyadmin/apache.conf /etc/apache2/conf-available/phpmyadmin.conf
+    a2enconf phpmyadmin
+    systemctl reload apache2
+fi
+
+# Restart Apache
+if ! systemctl restart apache2; then
+    echo "Failed to restart Apache."
+    exit 1
+fi
+
+echo "phpMyAdmin has been installed successfully."
