@@ -18,7 +18,7 @@ fi
 
 MariaDB_Installeren_Configureren() {
     echo "Voeg ondrej/php PPA toe en werk de package lists bij"
-    apt-get install -y gnupg2 ca-certificates curl 
+    apt-get install -y gnupg2 gnupg ca-certificates curl 
     wget -O /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg
     echo "deb https://packages.sury.org/php/ $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/php.list >/dev/null
     apt update -y
