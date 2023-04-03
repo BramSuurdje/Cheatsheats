@@ -2,19 +2,67 @@
 # Gemaakt door Bram Suurd
 # 134587@student.drenthecollege.nl
 
-if [ "$USER" != "root" ]
-then
-    echo "Voer dit uit als root"
-    exit 2
-fi
+    if [ "$USER" != "root" ]
+    then
+        echo "Voer dit uit als root"
+        exit 2
+    fi
 
-DIALOG_INSTALLED=$(dpkg-query -W --showformat='${Status}\n' dialog|grep "install ok installed")
+    if ! command -v dialog &> /dev/null
+    then
+        echo "dialog is niet geïnstalleerd, nu installeren..."
+        apt install -y dialog > /dev/null
+    fi
 
-if [ "$DIALOG_INSTALLED" == "" ]; then
-  echo "Dialog is niet geïnstalleerd, nu installeren ..."
-  apt-get update 
-  apt-get install -y dialog > /dev/null 2>&1
-fi
+function Schijven_Mounten() {
+    if ! command -v parted &> /dev/null
+    then
+        echo "Parted is niet geïnstalleerd, nu installeren..."
+        apt install -y parted > /dev/null
+    fi
+
+    clear
+
+    lsblk
+
+    #
+    read -p "Wat is de naam van 1/1 100GB schijven (e.g. /dev/sda): " device1
+    read -p "Wat is de naam van 1/2 50GB schijven (e.g. /dev/sdb): " device2
+    read -p "Wat is de naam van 2/2 50GB schijven  (e.g. /dev/sdc): " device3
+
+    mount1="/data"
+    mount2="/back"
+    mount3="/ftp"
+
+    parted -s $device1 mklabel gpt mkpart primary ext4 0% 100%
+    parted -s $device2 mklabel gpt mkpart primary ext4 0% 100%
+    parted -s $device3 mklabel gpt mkpart primary ext4 0% 100%
+
+    mkdir -p $mount1
+    mkdir -p $mount2
+    mkdir -p $mount3
+
+    mkfs.ext4 ${device1}1
+    mkfs.ext4 ${device2}1
+    mkfs.ext4 ${device3}1
+
+    uuid1=$(blkid -o value -s UUID ${device1}1)
+    uuid2=$(blkid -o value -s UUID ${device2}1)
+    uuid3=$(blkid -o value -s UUID ${device3}1)
+
+    echo "UUID=$uuid1    $mount1    ext4    defaults    0    2" | tee -a /etc/fstab
+    echo "UUID=$uuid2    $mount2    ext4    defaults    0    2" | tee -a /etc/fstab
+    echo "UUID=$uuid3    $mount3    ext4    defaults    0    2" | tee -a /etc/fstab
+
+    mount -a
+
+    echo "Start uw systeem opnieuw op om alles toe te passen. Wilt u nu opnieuw opstarten? (y/n)"
+    read answer
+
+    if [ "$answer" != "${answer#[Yy]}" ]; then
+        reboot
+    fi
+}
 
 function Dependencies_Installeren() {
     if [ -f /tmp/dependencies-installed ]; then
@@ -235,7 +283,7 @@ function Gegevens_Weblinks() {
 
 function Gebruikers_Toevoegen() {
 
-    sudo -u www-data php /var/www/html/nextcloud/occ config:system:set default_language --value="nl"
+    -u www-data php /var/www/html/nextcloud/occ config:system:set default_language --value="nl"
 
     printf "Voer de naam van de nieuwe gebruiker in: "
     read username
@@ -266,13 +314,13 @@ function Gebruikers_Toevoegen() {
     else
         printf "Groep aanmaken %s\n" "$department"
         groupadd "$department"
-        sudo -u www-data php /var/www/html/nextcloud/occ group:add "$department"
+        -u www-data php /var/www/html/nextcloud/occ group:add "$department"
     fi
     
     if ! command -v pwgen &> /dev/null
     then
         echo "pwgen is niet geinstalleerd, nu installeren..."
-        sudo apt install pwgen -y
+        apt install pwgen -y
     else
         echo ""
     fi
@@ -300,8 +348,9 @@ MENU="Kies een van de volgende opties:"
 OPTIONS=(1 "Gebruikers Toevoegen"
          2 "Alle web links laten zien"
          3 "Specifieke Scripts uitvoeren"
-         4 "Complete script runnen"
-         5 "Exit")
+         4 "Compleet script runnen"
+         5 "Schijven Mounten"
+         6 "Exit")
 
 while true; do
     CHOICE=$(dialog --clear \
@@ -329,7 +378,6 @@ case $CHOICE in
         Gegevens_Weblinks
         ;;
     3)
-        # sub-menu loop
         while true; do
             SUBMENU="Kies een van de volgende opties:"
             SUBOPTIONS=(1 "MariaDB Installeren en instellen"
@@ -409,6 +457,10 @@ case $CHOICE in
         Post_Install
         ;;
     5)
+        echo "Beginnen met het mounten van de schijven..."
+        Schijven_Mounten || echo "Fout bij het Mounten van de schijven"
+        ;;
+    6)
         exit
         ;;
     *)
