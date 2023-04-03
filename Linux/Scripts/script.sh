@@ -13,7 +13,7 @@ DIALOG_INSTALLED=$(dpkg-query -W --showformat='${Status}\n' dialog|grep "install
 if [ "$DIALOG_INSTALLED" == "" ]; then
   echo "Dialog is niet geïnstalleerd, nu installeren ..."
   apt-get update 
-  apt-get install -y dialog 
+  apt-get install -y dialog > /dev/null 2>&1
 fi
 
 function Dependencies_Installeren() {
@@ -27,7 +27,7 @@ function Dependencies_Installeren() {
     wget -O /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg
     echo "deb https://packages.sury.org/php/ $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/php.list >/dev/null
     apt update -y
-    required_packages=("apache2" "mariadb-server" "curl" "php" "libapache2-mod-php" "php-gd" "php-mysql" "php-curl" "php-mbstring" "php-intl" "php-imagick" "php-xml" "php-zip")
+    required_packages=("apache2" "mariadb-server" "curl" "php" "libapache2-mod-php" "php-gd" "php-mysql" "php-curl" "php-mbstring" "php-intl" "php-imagick" "php-xml" "php-zip" "php-json")
     for package in "${required_packages[@]}"; do
         if ! dpkg -s "$package" >/dev/null 2>&1; then
             apt-get install -y "$package"
@@ -189,13 +189,12 @@ function Docker_Installeren() {
     "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
     tee /etc/apt/sources.list.d/docker.list > /dev/null
     apt-get update -y
-    apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
 }
-
 
 function Post_Install() {
     set -e
-
+    mkdir -p /data/gegevens
     clear
 
     WEBMIN_PORT=10000
@@ -204,6 +203,7 @@ function Post_Install() {
     WEBMIN_URL="https://${SERVER_IP}:${WEBMIN_PORT}/"
     WORDPRESS_URL="http://${SERVER_IP}/wordpress/"
 
+    { 
     echo "Hierbij alle web-interfaces:"
     echo "Nextcloud URL: $NEXTCLOUD_URL"
     echo "Webmin URL: $WEBMIN_URL"
@@ -219,9 +219,19 @@ function Post_Install() {
     echo "Wordpress gebruikersnaam: $wordpress_dbuser"
     echo "Wordpress wachtwoord: $db_password"
     echo "Wordpress DatabaseServer: Localhost"
+    } |& tee -a /data/gegevens/wachtwoorden.txt
 
 }
 
+function Gegevens_Weblinks() {
+    Weblinks_Path="/data/gegevens/wachtwoorden.txt"
+
+    if [ -f "$Weblinks_Path" ]; then
+    cat "$Weblinks_Path"
+    else
+    echo "File $Weblinks_Path does not exist"
+    fi
+}
 
 function Gebruikers_Toevoegen() {
 
@@ -278,6 +288,8 @@ function Gebruikers_Toevoegen() {
     mkdir -p /data/user-accounts && printf "Gebruiker %s is aangemaakt met gebruikersnaam %s, wachtwoord %s, en toegevoegd aan de groep %s\n, het watchwoord voor nextcloud is 'wachtwoord123'" "$username" "$employee_number" "$password" "$department"  | tee -a /data/user-accounts/$employee_number-Wachtwoord.txt
 } 
 
+function Menu() {
+
 HEIGHT=15
 WIDTH=60
 CHOICE_HEIGHT=6
@@ -285,10 +297,10 @@ BACKTITLE="Linux Project"
 TITLE="Linux Drenthecollege"
 MENU="Kies een van de volgende opties:"
 
-OPTIONS=(1 "Alle Scripts Uitvoeren"
-         2 "Specifieke Scripts Uitvoeren"
-         3 "Alle web links laten zien"
-         4 "Gebruikers Toevoegen"
+OPTIONS=(1 "Gebruikers Toevoegen"
+         2 "Alle web links laten zien"
+         3 "Specifieke Scripts uitvoeren"
+         4 "Complete script runnen"
          5 "Exit")
 
 while true; do
@@ -311,21 +323,12 @@ done
 
 case $CHOICE in
     1)
-        echo "Dependencies aan het installeren..."
-        Dependencies_Installeren || echo "Fout bij het installeren van dependencies"
-        echo "MariaDB aan het Configureren..."
-        MariaDB_Configureren || echo "Fout bij het configureren van Mariadb"
-        echo "Nextcloud aan het installeren..."
-        Nextcloud_Installeren || echo "Fout bij het installeren van Nextcloud"
-        echo "Wordpress aan het installeren..."
-        Wordpress_Installeren || echo "Fout bij het installeren van Wordpress"
-        echo "Webmin aan het installeren..."
-        Webmin_Installeren || echo "Fout bij het installeren van Webmin"
-        echo "Back-ups instellen..."
-        Backups_instellen || echo "Fout bij het instellen van back-ups"
-        Post_Install
+        Gebruikers_Toevoegen
         ;;
     2)
+        Gegevens_Weblinks
+        ;;
+    3)
         # sub-menu loop
         while true; do
             SUBMENU="Kies een van de volgende opties:"
@@ -390,50 +393,27 @@ case $CHOICE in
                 ;;
         esac
         ;;
-    3)
-        Post_Install
-        ;;
     4)
-        Gebruikers_Toevoegen
+        echo "Dependencies aan het installeren..."
+        Dependencies_Installeren || echo "Fout bij het installeren van dependencies"
+        echo "MariaDB aan het Configureren..."
+        MariaDB_Configureren || echo "Fout bij het configureren van Mariadb"
+        echo "Nextcloud aan het installeren..."
+        Nextcloud_Installeren || echo "Fout bij het installeren van Nextcloud"
+        echo "Wordpress aan het installeren..."
+        Wordpress_Installeren || echo "Fout bij het installeren van Wordpress"
+        echo "Webmin aan het installeren..."
+        Webmin_Installeren || echo "Fout bij het installeren van Webmin"
+        echo "Back-ups instellen..."
+        Backups_instellen || echo "Fout bij het instellen van back-ups"
+        Post_Install
         ;;
     5)
         exit
         ;;
     *)
-        echo "Ongeldige optie geselecteerd. Probeer het opnieuw."
+        echo "Ongeldige invoer. Voer een getal in tussen 1 en 7."
         ;;
 esac
-
-
-#
-# Check if phpMyAdmin is already installed
-if dpkg -l phpmyadmin >/dev/null 2>&1; then
-    echo "phpMyAdmin is already installed."
-    exit 0
-fi
-
-# Install required packages
-if ! apt-get update; then
-    echo "Failed to update package index."
-    exit 1
-fi
-
-if ! apt-get install -y phpmyadmin php-mbstring php-zip php-gd php-json php-curl; then
-    echo "Failed to install phpMyAdmin."
-    exit 1
-fi
-
-# Configure phpMyAdmin to use Apache
-if [ ! -f /etc/apache2/conf-available/phpmyadmin.conf ]; then
-    ln -s /etc/phpmyadmin/apache.conf /etc/apache2/conf-available/phpmyadmin.conf
-    a2enconf phpmyadmin
-    systemctl reload apache2
-fi
-
-# Restart Apache
-if ! systemctl restart apache2; then
-    echo "Failed to restart Apache."
-    exit 1
-fi
-
-echo "phpMyAdmin has been installed successfully."
+}
+Menu
