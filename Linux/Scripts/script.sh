@@ -23,16 +23,21 @@ function Schijven_Mounten() {
 
     clear
 
-    lsblk
+    # List all disks and their sizes
+    disks=$(lsblk -o NAME,SIZE -d -p -n)
 
-    #
-    read -p "Wat is de naam van 1/1 100GB schijven (e.g. /dev/sda): " device1
-    read -p "Wat is de naam van 1/2 50GB schijven (e.g. /dev/sdb): " device2
-    read -p "Wat is de naam van 2/2 50GB schijven  (e.g. /dev/sdc): " device3
+    # Extract the last letter of the disk names
+    letter1=$(echo "$disks" | awk '/100G/ { print substr($1, length($1)-2, 1) }')
+    letter2=$(echo "$disks" | awk '/50G/ { print substr($1, length($1)-2, 1) }' | head -n 1)
+    letter3=$(echo "$disks" | awk '/50G/ { print substr($1, length($1)-2, 1) }' | tail -n 1)
 
     mount1="/data"
     mount2="/back"
     mount3="/ftp"
+
+    device1="/dev/sd$letter1"
+    device2="/dev/sd$letter2"
+    device3="/dev/sd$letter3"
 
     parted -s $device1 mklabel gpt mkpart primary ext4 0% 100%
     parted -s $device2 mklabel gpt mkpart primary ext4 0% 100%
@@ -63,6 +68,7 @@ function Schijven_Mounten() {
         reboot
     fi
 }
+
 
 function Dependencies_Installeren() {
     if [ -f /tmp/dependencies-installed ]; then
@@ -123,7 +129,6 @@ EOF
 
 function Nextcloud_Installeren() {
     NEXTCLOUD_PATH=/var/www/html/nextcloud
-
     if [ -d "$NEXTCLOUD_PATH" ]; then
         echo "Nextcloud is al geïnstalleerd."
         return 0
@@ -136,9 +141,8 @@ function Nextcloud_Installeren() {
         curl -o latest.tar.bz2 https://download.nextcloud.com/server/releases/latest.tar.bz2
     fi
 
-    NEXTCLOUD_PATH=/var/www/html/nextcloud
     tar -xvjf latest.tar.bz2 -C "/var/www/html"
-
+    rm latest.tar.bz2
     echo "Regels instellen voor de Nextcloud-directory..."
     chown -R www-data:www-data "$NEXTCLOUD_PATH"
     chmod -R u+rwX,g+rX,o+rX "$NEXTCLOUD_PATH"
@@ -277,13 +281,23 @@ function Gegevens_Weblinks() {
     if [ -f "$Weblinks_Path" ]; then
     cat "$Weblinks_Path"
     else
+        echo ""
+    fi
+}
+
+function Gegevens_Weblinks() {
+    Weblinks_Path="/data/gegevens/wachtwoorden.txt"
+
+    if [ -f "$Weblinks_Path" ]; then
+    cat "$Weblinks_Path"
+    else
     echo "File $Weblinks_Path does not exist"
     fi
 }
 
 function Gebruikers_Toevoegen() {
 
-    -u www-data php /var/www/html/nextcloud/occ config:system:set default_language --value="nl"
+    su -s /bin/sh www-data -c "php" /var/www/html/nextcloud/occ config:system set default_language --value="nl"
 
     printf "Voer de naam van de nieuwe gebruiker in: "
     read username
@@ -314,7 +328,7 @@ function Gebruikers_Toevoegen() {
     else
         printf "Groep aanmaken %s\n" "$department"
         groupadd "$department"
-        -u www-data php /var/www/html/nextcloud/occ group:add "$department"
+        -u www-data php /var/www/html/nextcloud/occ group:add --quota=5G \"$department\"
     fi
     
     if ! command -v pwgen &> /dev/null
@@ -332,8 +346,10 @@ function Gebruikers_Toevoegen() {
     usermod -aG "$department" "$employee_number"
     export OC_PASS=$password
     su -s /bin/sh www-data -c "php /var/www/html/nextcloud/occ user:add --password-from-env --display-name=\"$username\" --group=\"$department\" \"$employee_number\""
+    su -s /bin/sh www-data -c "php /var/www/html/nextcloud/occ user:setting \"$employee_number\" files quota 5G"
 
-    mkdir -p /data/user-accounts && printf "Gebruiker %s is aangemaakt met gebruikersnaam %s, wachtwoord %s, en toegevoegd aan de groep %s\n, het watchwoord voor nextcloud is 'wachtwoord123'" "$username" "$employee_number" "$password" "$department"  | tee -a /data/user-accounts/$employee_number-Wachtwoord.txt
+    mkdir -p /data/user-accounts && printf "Gebruiker %s is aangemaakt met gebruikersnaam %s, wachtwoord %s, en toegevoegd aan de groep %s met een quota van 5GB\n" "$username" "$employee_number" "$password" "$department" | tee -a /data/user-accounts/$employee_number-Wachtwoord.txt
+
 } 
 
 function Menu() {
