@@ -15,58 +15,64 @@
     fi
 
 function Schijven_Mounten() {
+
+    if grep -q "/data" /etc/fstab; then
+        echo "de schijven zijn al gemount"
+        sed -i '/script.sh/d' ~/.bashrc
+        return
+    fi
     if ! command -v parted &> /dev/null
     then
         echo "Parted is niet geïnstalleerd, nu installeren..."
         apt install -y parted > /dev/null
     fi
 
-    clear
+device1=$(lsblk -o NAME,SIZE | grep " 100G$" | awk '{print $1}')
+if [ -z "$device1" ]; then
+    echo "Kan de 100GB-schijf niet vinden."
+    exit 1
+fi
 
-    # List all disks and their sizes
-    disks=$(lsblk -o NAME,SIZE -d -p -n)
+# Find the 50GB disks
+device2=$(lsblk -o NAME,SIZE | grep " 50G$" | awk '{print $1}' | head -n 1)
+if [ -z "$device2" ]; then
+    echo "Kan de eerste 50GB-schijf niet vinden."
+    exit 1
+fi
 
-    # Extract the last letter of the disk names
-    letter1=$(echo "$disks" | awk '/100G/ { print substr($1, length($1)-2, 1) }')
-    letter2=$(echo "$disks" | awk '/50G/ { print substr($1, length($1)-2, 1) }' | head -n 1)
-    letter3=$(echo "$disks" | awk '/50G/ { print substr($1, length($1)-2, 1) }' | tail -n 1)
+device3=$(lsblk -o NAME,SIZE | grep " 50G$" | awk '{print $1}' | tail -n 1)
+if [ -z "$device3" ]; then
+    echo "Kan de tweede 50GB-schijf niet vinden."
+    exit 1
+fi
 
-    mount1="/data"
-    mount2="/back"
-    mount3="/ftp"
+parted -s /dev/$device1 mklabel gpt mkpart primary ext4 0% 100%
+parted -s /dev/$device2 mklabel gpt mkpart primary ext4 0% 100%
+parted -s /dev/$device3 mklabel gpt mkpart primary ext4 0% 100%
 
-    device1="/dev/sd$letter1"
-    device2="/dev/sd$letter2"
-    device3="/dev/sd$letter3"
+mkfs.ext4 /dev/${device1}1
+mkfs.ext4 /dev/${device2}1
+mkfs.ext4 /dev/${device3}1
 
-    parted -s $device1 mklabel gpt mkpart primary ext4 0% 100%
-    parted -s $device2 mklabel gpt mkpart primary ext4 0% 100%
-    parted -s $device3 mklabel gpt mkpart primary ext4 0% 100%
+uuid1=$(sudo blkid -o value -s UUID /dev/${device1}1 | cut -d '"' -f 2)
+uuid2=$(sudo blkid -o value -s UUID /dev/${device2}1 | cut -d '"' -f 2)
+uuid3=$(sudo blkid -o value -s UUID /dev/${device3}1 | cut -d '"' -f 2)
 
-    mkdir -p $mount1
-    mkdir -p $mount2
-    mkdir -p $mount3
 
-    mkfs.ext4 ${device1}1
-    mkfs.ext4 ${device2}1
-    mkfs.ext4 ${device3}1
+echo "UUID=$uuid1    /data    ext4    defaults    0    2" >> /etc/fstab
+echo "UUID=$uuid2    /back    ext4    defaults    0    2" >> /etc/fstab
+echo "UUID=$uuid3    /ftp    ext4    defaults    0    2" >> /etc/fstab
 
-    uuid1=$(blkid -o value -s UUID ${device1}1)
-    uuid2=$(blkid -o value -s UUID ${device2}1)
-    uuid3=$(blkid -o value -s UUID ${device3}1)
+mount -a
 
-    echo "UUID=$uuid1    $mount1    ext4    defaults    0    2" | tee -a /etc/fstab
-    echo "UUID=$uuid2    $mount2    ext4    defaults    0    2" | tee -a /etc/fstab
-    echo "UUID=$uuid3    $mount3    ext4    defaults    0    2" | tee -a /etc/fstab
+echo "Start uw systeem opnieuw op om alles toe te passen. Wilt u nu opnieuw opstarten? (y/n)"
+read answer
 
-    mount -a
+if [ "$answer" != "${answer#[Yy]}" ]; then
+    echo "/root/script.sh" >> /root/.bashrc
+    reboot
+fi
 
-    echo "Start uw systeem opnieuw op om alles toe te passen. Wilt u nu opnieuw opstarten? (y/n)"
-    read answer
-
-    if [ "$answer" != "${answer#[Yy]}" ]; then
-        reboot
-    fi
 }
 
 
@@ -451,6 +457,8 @@ case $CHOICE in
         esac
         ;;
     4)
+        echo "Schijven mounten..."
+        Schijven_Mounten || echo "Fout bij het mounten van schijven"
         echo "Dependencies aan het installeren..."
         Dependencies_Installeren || echo "Fout bij het installeren van dependencies"
         echo "MariaDB aan het Configureren..."
