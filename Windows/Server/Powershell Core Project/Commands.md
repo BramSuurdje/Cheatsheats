@@ -25,7 +25,7 @@ New-ADOrganizationalUnit -Name "Bovenliggende" -Path "DC=powershell,DC=dc"
 ```ps1
 New-ADOrganizationalUnit -Name "Onderliggende1" -Path "OU=Bovenliggende,DC=powershell,DC=dc"
 ```
-### dit moet je 4 keer doen, elke keer moet je het nummer veranderen.
+dit moet je 4 keer doen, elke keer moet je het nummer veranderen.
 
 #### Toevoegen van een Security Groep
 ```ps1
