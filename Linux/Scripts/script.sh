@@ -18,7 +18,7 @@ function Schijven_Mounten() {
 
     if grep -q "/data" /etc/fstab; then
         echo "Schijven_Mounten is al uitgevoerd. Skipping.."
-        sed -i '/script.sh/d' /root/.bashrc
+        sed -i '/script.sh/d Na_Schijven_Mounten' /root/.bashrc
         return
     fi
 
@@ -83,14 +83,16 @@ function Schijven_Mounten() {
     read answer
 
     if [ "$answer" != "${answer#[Yy]}" ]; then
-        echo "/root/script.sh" >> /root/.bashrc
+        echo "/root/script.sh Na_Schijven_Mounten" >> /root/.bashrc
         reboot
+        sleep 2
     fi
 
 }
 
 
 function Dependencies_Installeren() {
+
     if [ -f /tmp/dependencies-installed ]; then
         echo "Dependencies zijn al geinstalleerd. Skipping..."
         return 0
@@ -312,6 +314,22 @@ function Gegevens_Weblinks() {
     fi
 }
 
+function Na_Schijven_Mounten() {
+    echo "Dependencies aan het installeren..."
+    Dependencies_Installeren || echo "Fout bij het installeren van dependencies"
+    echo "MariaDB aan het Configureren..."
+    MariaDB_Configureren || echo "Fout bij het configureren van Mariadb"
+    echo "Nextcloud aan het installeren..."
+    Nextcloud_Installeren || echo "Fout bij het installeren van Nextcloud"
+    echo "Wordpress aan het installeren..."
+    Wordpress_Installeren || echo "Fout bij het installeren van Wordpress"
+    echo "Webmin aan het installeren..."
+    Webmin_Installeren || echo "Fout bij het installeren van Webmin"
+    echo "Back-ups instellen..."
+    Backups_instellen || echo "Fout bij het instellen van back-ups"
+    Post_Install
+}
+
 function Gebruikers_Toevoegen() {
 
     -u www-data php /var/www/html/nextcloud/occ config:system:set default_language --value="nl"
@@ -368,7 +386,6 @@ function Gebruikers_Toevoegen() {
 } 
 
 function Menu() {
-
 HEIGHT=15
 WIDTH=60
 CHOICE_HEIGHT=6
@@ -479,19 +496,6 @@ case $CHOICE in
     5)
         echo "Eerst gaan we de schijven mounten..."
         Schijven_Mounten || echo "Fout bij het mounten van de schijven"
-        echo "Dependencies aan het installeren..."
-        Dependencies_Installeren || echo "Fout bij het installeren van dependencies"
-        echo "MariaDB aan het Configureren..."
-        MariaDB_Configureren || echo "Fout bij het configureren van Mariadb"
-        echo "Nextcloud aan het installeren..."
-        Nextcloud_Installeren || echo "Fout bij het installeren van Nextcloud"
-        echo "Wordpress aan het installeren..."
-        Wordpress_Installeren || echo "Fout bij het installeren van Wordpress"
-        echo "Webmin aan het installeren..."
-        Webmin_Installeren || echo "Fout bij het installeren van Webmin"
-        echo "Back-ups instellen..."
-        Backups_instellen || echo "Fout bij het instellen van back-ups"
-        Post_Install
         ;;
     6)
         exit
@@ -501,4 +505,5 @@ case $CHOICE in
         ;;
 esac
 }
+"$1"  # execute the function passed as the first argument
 Menu
