@@ -386,7 +386,7 @@ case $CHOICE in
     2)
         Gegevens_Weblinks
         ;;
-    )
+    3)
         while true; do
             SUBMENU="Kies een van de volgende opties:"
             SUBOPTIONS=(1 "MariaDB Installeren en instellen"
