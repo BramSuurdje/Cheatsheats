@@ -394,11 +394,10 @@ TITLE="Linux Drenthecollege"
 MENU="Kies een van de volgende opties:"
 
 OPTIONS=(1 "Gebruikers Toevoegen"
-         2 "Schijven Mounten"
-         3 "Alle web links laten zien"
-         4 "Specifieke Scripts uitvoeren"
-         5 "Compleet script runnen"
-         6 "Exit")
+         2 "Alle web links laten zien"
+         3 "Specifieke Scripts uitvoeren"
+         4 "Compleet script runnen"
+         5 "Exit")
 
 while true; do
     CHOICE=$(dialog --clear \
@@ -423,13 +422,9 @@ case $CHOICE in
         Gebruikers_Toevoegen
         ;;
     2)
-        echo "Beginnen met het mounten van de schijven..."
-        Schijven_Mounten || echo "Fout bij het Mounten van de schijven"
-        ;;
-    3)
         Gegevens_Weblinks
         ;;
-    4)
+    3)
         while true; do
             SUBMENU="Kies een van de volgende opties:"
             SUBOPTIONS=(1 "MariaDB Installeren en instellen"
@@ -493,11 +488,11 @@ case $CHOICE in
                 ;;
         esac
         ;;
-    5)
+    4)
         echo "Eerst gaan we de schijven mounten..."
         Schijven_Mounten || echo "Fout bij het mounten van de schijven"
         ;;
-    6)
+    5)
         exit
         ;;
     *)
