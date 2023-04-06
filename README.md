@@ -3,4 +3,4 @@
 
 [Powershell Core Project](https://github.com/BramSuurdje/Cheatsheats/blob/main/Windows/Server/Powershell%20Core%20Project/Commands.md)
 
-[Linux Project full script](https://github.com/BramSuurdje/Cheatsheats/blob/main/Linux/Scripts/script.sh)
+[Linux Project full script](https://github.com/BramSuurdje/Cheatsheats/blob/main/Linux/Scripts/manual-bit.md)
