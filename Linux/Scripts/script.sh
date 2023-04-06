@@ -231,6 +231,7 @@ function Webmin_Installeren() {
     apt-get install -y webmin
 } 
 
+
 function Docker_Installeren() {
     apt-get update -y
     apt-get install ca-certificates curl gnupg -y
@@ -243,6 +244,7 @@ function Docker_Installeren() {
     apt-get update -y
     apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
 }
+
 
 function Post_Install() {
     set -e
@@ -275,6 +277,7 @@ function Post_Install() {
 
 }
 
+
 function Gegevens_Weblinks() {
     Weblinks_Path="/data/gegevens/wachtwoorden.txt"
 
@@ -285,6 +288,7 @@ function Gegevens_Weblinks() {
     fi
 }
 
+
 function Gegevens_Weblinks() {
     Weblinks_Path="/data/gegevens/wachtwoorden.txt"
 
@@ -294,6 +298,7 @@ function Gegevens_Weblinks() {
     echo "File $Weblinks_Path does not exist"
     fi
 }
+
 
 function Gebruikers_Toevoegen() {
 
@@ -351,6 +356,7 @@ function Gebruikers_Toevoegen() {
     mkdir -p /data/user-accounts && printf "Gebruiker %s is aangemaakt met gebruikersnaam %s, wachtwoord %s, en toegevoegd aan de groep %s met een quota van 5GB\n" "$username" "$employee_number" "$password" "$department" | tee -a /data/user-accounts/$employee_number-Wachtwoord.txt
 
 } 
+
 
 function Menu() {
 
@@ -484,4 +490,5 @@ case $CHOICE in
         ;;
 esac
 }
+
 Menu
