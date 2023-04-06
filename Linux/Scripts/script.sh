@@ -17,61 +17,75 @@
 function Schijven_Mounten() {
 
     if grep -q "/data" /etc/fstab; then
-        echo "de schijven zijn al gemount"
-        sed -i '/script.sh/d' ~/.bashrc
+        echo "Schijven_Mounten is al uitgevoerd. Skipping.."
+        sed -i '/script.sh/d' /root/.bashrc
         return
     fi
+
     if ! command -v parted &> /dev/null
     then
         echo "Parted is niet geïnstalleerd, nu installeren..."
         apt install -y parted > /dev/null
     fi
 
-device1=$(lsblk -o NAME,SIZE | grep " 100G$" | awk '{print $1}')
-if [ -z "$device1" ]; then
-    echo "Kan de 100GB-schijf niet vinden."
-    exit 1
-fi
+    clear
 
-# Find the 50GB disks
-device2=$(lsblk -o NAME,SIZE | grep " 50G$" | awk '{print $1}' | head -n 1)
-if [ -z "$device2" ]; then
-    echo "Kan de eerste 50GB-schijf niet vinden."
-    exit 1
-fi
+    device1=$(lsblk -o NAME,SIZE | grep " 100G$" | awk '{print $1}')
+    if [ -z "$device1" ]; then
+        echo "Kan de 100GB-schijf niet vinden."
+        exit 1
+    fi
 
-device3=$(lsblk -o NAME,SIZE | grep " 50G$" | awk '{print $1}' | tail -n 1)
-if [ -z "$device3" ]; then
-    echo "Kan de tweede 50GB-schijf niet vinden."
-    exit 1
-fi
+    # Find the 50GB disks
+    device2=$(lsblk -o NAME,SIZE | grep " 50G$" | awk '{print $1}' | head -n 1)
+    if [ -z "$device2" ]; then
+        echo "Kan de eerste 50GB-schijf niet vinden."
+        exit 1
+    fi
 
-parted -s /dev/$device1 mklabel gpt mkpart primary ext4 0% 100%
-parted -s /dev/$device2 mklabel gpt mkpart primary ext4 0% 100%
-parted -s /dev/$device3 mklabel gpt mkpart primary ext4 0% 100%
+    device3=$(lsblk -o NAME,SIZE | grep " 50G$" | awk '{print $1}' | tail -n 1)
+    if [ -z "$device3" ]; then
+        echo "Kan de tweede 50GB-schijf niet vinden."
+        exit 1
+    fi
 
-mkfs.ext4 /dev/${device1}1
-mkfs.ext4 /dev/${device2}1
-mkfs.ext4 /dev/${device3}1
+    mount1="/data"
+    mount2="/back"
+    mount3="/ftp"
 
-uuid1=$(sudo blkid -o value -s UUID /dev/${device1}1 | cut -d '"' -f 2)
-uuid2=$(sudo blkid -o value -s UUID /dev/${device2}1 | cut -d '"' -f 2)
-uuid3=$(sudo blkid -o value -s UUID /dev/${device3}1 | cut -d '"' -f 2)
+    parted -s /dev/$device1 mklabel gpt mkpart primary ext4 0% 100%
+    parted -s /dev/$device2 mklabel gpt mkpart primary ext4 0% 100%
+    parted -s /dev/$device3 mklabel gpt mkpart primary ext4 0% 100%
+
+    mkdir -p $mount1
+    mkdir -p $mount2
+    mkdir -p $mount3
+
+    mkfs.ext4 /dev/${device1}1
+    mkfs.ext4 /dev/${device2}1
+    mkfs.ext4 /dev/${device3}1
+
+    sleep 1
+
+    uuid1=$(sudo blkid -o value -s UUID /dev/${device1}1 | cut -d '"' -f 2)
+    uuid2=$(sudo blkid -o value -s UUID /dev/${device2}1 | cut -d '"' -f 2)
+    uuid3=$(sudo blkid -o value -s UUID /dev/${device3}1 | cut -d '"' -f 2)
 
 
-echo "UUID=$uuid1    /data    ext4    defaults    0    2" >> /etc/fstab
-echo "UUID=$uuid2    /back    ext4    defaults    0    2" >> /etc/fstab
-echo "UUID=$uuid3    /ftp    ext4    defaults    0    2" >> /etc/fstab
 
-mount -a
+    echo "UUID=$uuid1    $mount1    ext4    defaults    0    2" | tee -a /etc/fstab
+    echo "UUID=$uuid2    $mount2    ext4    defaults    0    2" | tee -a /etc/fstab
+    echo "UUID=$uuid3    $mount3    ext4    defaults    0    2" | tee -a /etc/fstab
 
-echo "Start uw systeem opnieuw op om alles toe te passen. Wilt u nu opnieuw opstarten? (y/n)"
-read answer
+    mount -a
 
-if [ "$answer" != "${answer#[Yy]}" ]; then
-    echo "/root/script.sh" >> /root/.bashrc
-    reboot
-fi
+    echo "Start uw systeem opnieuw op om alles toe te passen. Wilt u nu opnieuw opstarten? (y/n)"
+    read answer
+
+    if [ "$answer" != "${answer#[Yy]}" ]; then
+        echo "/root/script.sh" >> /root/.bashrc
+        reboot
+    fi
 
 }
 
@@ -83,11 +97,11 @@ function Dependencies_Installeren() {
     fi
 
     echo "Voeg ondrej/php PPA toe en werk de package lists bij..."
-    apt-get install -y gnupg2 gnupg ca-certificates curl apt-transport-https lsb-release 
+    apt-get install -y gnupg2 gnupg ca-certificates curl 
     wget -O /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg
     echo "deb https://packages.sury.org/php/ $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/php.list >/dev/null
     apt update -y
-    required_packages=("gnupg2" "gnupg" "ca-certificates" "curl" "apt-transport-https" "lsb-release" "apache2" "mariadb-server" "curl" "php" "libapache2-mod-php" "php-gd" "php-mysql" "php-curl" "php-mbstring" "php-intl" "php-imagick" "php-xml" "php-zip" "php-json")
+    required_packages=("apache2" "mariadb-server" "curl" "php" "libapache2-mod-php" "php-gd" "php-mysql" "php-curl" "php-mbstring" "php-intl" "php-imagick" "php-xml" "php-zip" "php-json")
     for package in "${required_packages[@]}"; do
         if ! dpkg -s "$package" >/dev/null 2>&1; then
             apt-get install -y "$package"
@@ -130,6 +144,11 @@ EOF
     GRANT ALL PRIVILEGES ON $wordpress_dbname.* TO '$wordpress_dbuser'@'localhost';
     FLUSH PRIVILEGES;
 EOF
+
+    echo "Nextcloud database en user zijn aangemaakt."
+    echo "Wordpress database en user zijn aangemaakt."
+    echo "MariaDB is geconfigureerd..."	
+
 }
 
 
@@ -283,7 +302,6 @@ function Post_Install() {
 
 }
 
-
 function Gegevens_Weblinks() {
     Weblinks_Path="/data/gegevens/wachtwoorden.txt"
 
@@ -296,38 +314,38 @@ function Gegevens_Weblinks() {
 
 function Gebruikers_Toevoegen() {
 
-    su -s /bin/sh www-data -c "php" /var/www/html/nextcloud/occ config:system set default_language --value="nl"
+    -u www-data php /var/www/html/nextcloud/occ config:system:set default_language --value="nl"
 
     printf "Voer de naam van de nieuwe gebruiker in: "
-    read username
+    read gebruikersnaam
 
     printf "Voer het personeelsnummer in: "
-    read employee_number
+    read gebruikersnummer
 
     printf "Voer de juiste afdeling in:\n"
     printf "1. Administratie\n"
     printf "2. Directie\n"
     printf "3. Verkoop\n"
-    read -p "Afdeling: " department_number
+    read -p "Afdeling: " groep_nummer
 
-    case $department_number in
-        1) department="Administratie" ;;
-        2) department="Directie" ;;
-        3) department="Verkoop" ;;
+    case $groep_nummer in
+        1) groep="Administratie" ;;
+        2) groep="Directie" ;;
+        3) groep="Verkoop" ;;
         *) echo "Ongeldig afdelingsnummer" && return ;;
     esac
 
-    if id -u "$username" >/dev/null 2>&1; then
-        printf "Gebruiker %s bestaat al\n" "$username"
+    if id -u "$gebruikersnaam" >/dev/null 2>&1; then
+        printf "Gebruiker %s bestaat al\n" "$gebruikersnaam"
         return
     fi
 
-    if getent group "$department" >/dev/null 2>&1; then
-        printf "Groep %s bestaat al\n" "$department"
+    if getent group "$groep" >/dev/null 2>&1; then
+        printf "Groep %s bestaat al\n" "$groep"
     else
-        printf "Groep aanmaken %s\n" "$department"
-        groupadd "$department"
-        -u www-data php /var/www/html/nextcloud/occ group:add --quota=5G \"$department\"
+        printf "Groep aanmaken %s\n" "$groep"
+        groupadd "$groep"
+        -u www-data php /var/www/html/nextcloud/occ group:add "$groep"
     fi
     
     if ! command -v pwgen &> /dev/null
@@ -341,16 +359,13 @@ function Gebruikers_Toevoegen() {
     password=$(pwgen -1cnsy 16)
     hashed_password=$(openssl passwd -1 "$password")
 
-    useradd -m -d "/home/$employee_number" -s /bin/bash -p "$hashed_password" "$employee_number"
-    usermod -aG "$department" "$employee_number"
+    useradd -m -d "/home/$ge" -s /bin/bash -p "$hashed_password" "$ge"
+    usermod -aG "$groep" "$ge"
     export OC_PASS=$password
-    su -s /bin/sh www-data -c "php /var/www/html/nextcloud/occ user:add --password-from-env --display-name=\"$username\" --group=\"$department\" \"$employee_number\""
-    su -s /bin/sh www-data -c "php /var/www/html/nextcloud/occ user:setting \"$employee_number\" files quota 5G"
+    su -s /bin/sh www-data -c "php /var/www/html/nextcloud/occ user:add --password-from-env --display-name=\"$gebruikersnaam\" --group=\"$groep\" \"$ge\""
 
-    mkdir -p /data/user-accounts && printf "Gebruiker %s is aangemaakt met gebruikersnaam %s, wachtwoord %s, en toegevoegd aan de groep %s met een quota van 5GB\n" "$username" "$employee_number" "$password" "$department" | tee -a /data/user-accounts/$employee_number-Wachtwoord.txt
-
+    mkdir -p /data/user-accounts && printf "Gebruiker %s is aangemaakt met gebruikersnaam %s, wachtwoord %s, en toegevoegd aan de groep %s\n, het watchwoord voor nextcloud is 'wachtwoord123'" "$gebruikersnaam" "$ge" "$password" "$groep"  | tee -a /data/user-accounts/$ge-Wachtwoord.txt
 } 
-
 
 function Menu() {
 
@@ -362,10 +377,11 @@ TITLE="Linux Drenthecollege"
 MENU="Kies een van de volgende opties:"
 
 OPTIONS=(1 "Gebruikers Toevoegen"
-         2 "Alle web links laten zien"
-         3 "Specifieke Scripts uitvoeren"
-         4 "Compleet script runnen"
-         5 "Exit")
+         2 "Schijven Mounten"
+         3 "Alle web links laten zien"
+         4 "Specifieke Scripts uitvoeren"
+         5 "Compleet script runnen"
+         6 "Exit")
 
 while true; do
     CHOICE=$(dialog --clear \
@@ -390,9 +406,13 @@ case $CHOICE in
         Gebruikers_Toevoegen
         ;;
     2)
-        Gegevens_Weblinks
+        echo "Beginnen met het mounten van de schijven..."
+        Schijven_Mounten || echo "Fout bij het Mounten van de schijven"
         ;;
     3)
+        Gegevens_Weblinks
+        ;;
+    4)
         while true; do
             SUBMENU="Kies een van de volgende opties:"
             SUBOPTIONS=(1 "MariaDB Installeren en instellen"
@@ -456,9 +476,9 @@ case $CHOICE in
                 ;;
         esac
         ;;
-    4)
-        echo "Schijven mounten..."
-        Schijven_Mounten || echo "Fout bij het mounten van schijven"
+    5)
+        echo "Eerst gaan we de schijven mounten..."
+        Schijven_Mounten || echo "Fout bij het mounten van de schijven"
         echo "Dependencies aan het installeren..."
         Dependencies_Installeren || echo "Fout bij het installeren van dependencies"
         echo "MariaDB aan het Configureren..."
@@ -473,7 +493,7 @@ case $CHOICE in
         Backups_instellen || echo "Fout bij het instellen van back-ups"
         Post_Install
         ;;
-    5)
+    6)
         exit
         ;;
     *)
@@ -481,5 +501,4 @@ case $CHOICE in
         ;;
 esac
 }
-
 Menu
