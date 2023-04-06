@@ -18,7 +18,7 @@ function Schijven_Mounten() {
 
     if grep -q "/data" /etc/fstab; then
         echo "Schijven_Mounten is al uitgevoerd. Skipping.."
-        sed -i '/script.sh/d Na_Schijven_Mounten' /root/.bashrc
+        sed -i '/script.sh Na_Schijven_Mounten/d' /root/.bashrc
         return
     fi
 
