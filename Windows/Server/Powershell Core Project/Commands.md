@@ -59,6 +59,8 @@ Add-DnsServerResourceRecordA -Name "WSC1" -IPv4Address "10.0.0.15" -ZoneName "po
 ```ps1
 Import-Module ActiveDirectory
 ```
+#### 
+zie voorbeeld csv [hier](Cheatsheats/Windows/Server/Powershell Core Project/users-toevoegen-voorbeeld.xlsx)
 #### Hier het gehele script om users toe te voegen aan het Systeem. verander onderandere de Import-Csv dir, de -HomeDirectory locatie varible.
 ```ps1
 # Store the data from NewUsersFinal.csv in the $ADUsers variable
