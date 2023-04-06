@@ -14,5 +14,4 @@ wget https://raw.githubusercontent.com/br4mSuurd/Cheatsheats/main/Linux/Scripts/
 chmod +x script.sh
 ./script.sh
 ```
-##### klik daan eerst op het menu "Schijven Mounten"
 ##### Vervolgens kun je op het kopje "Compleet script runnen" klikken. om alles te laten doen. er zal 1 keer om een wachtwoord te bedenken voor de databases.
