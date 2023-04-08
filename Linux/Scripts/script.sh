@@ -386,119 +386,119 @@ function Gebruikers_Toevoegen() {
 } 
 
 function Menu() {
-HEIGHT=15
-WIDTH=60
-CHOICE_HEIGHT=6
-BACKTITLE="Linux Project"
-TITLE="Linux Drenthecollege"
-MENU="Kies een van de volgende opties:"
+    HEIGHT=15
+    WIDTH=60
+    CHOICE_HEIGHT=6
+    BACKTITLE="Linux Project"
+    TITLE="Linux Drenthecollege"
+    MENU="Kies een van de volgende opties:"
 
-OPTIONS=(1 "Gebruikers Toevoegen"
-         2 "Alle web links laten zien"
-         3 "Specifieke Scripts uitvoeren"
-         4 "Compleet script runnen"
-         5 "Exit")
+    OPTIONS=(1 "Gebruikers Toevoegen"
+            2 "Alle web links laten zien"
+            3 "Specifieke Scripts uitvoeren"
+            4 "Compleet script runnen"
+            5 "Exit")
 
-while true; do
-    CHOICE=$(dialog --clear \
-                    --backtitle "$BACKTITLE" \
-                    --title "$TITLE" \
-                    --menu "$MENU" \
-                    $HEIGHT $WIDTH $CHOICE_HEIGHT \
-                    "${OPTIONS[@]}" \
-                    2>&1 >/dev/tty)
+    while true; do
+        CHOICE=$(dialog --clear \
+                        --backtitle "$BACKTITLE" \
+                        --title "$TITLE" \
+                        --menu "$MENU" \
+                        $HEIGHT $WIDTH $CHOICE_HEIGHT \
+                        "${OPTIONS[@]}" \
+                        2>&1 >/dev/tty)
 
-    if [[ $CHOICE =~ ^[1-5]$ ]]; then
-        clear
-        break
-    else
-        echo "Ongeldige invoer. Voer een getal in tussen 1 en 6."
-    fi
+        if [[ $CHOICE =~ ^[1-5]$ ]]; then
+            clear
+            break
+        else
+            echo "Ongeldige invoer. Voer een getal in tussen 1 en 6."
+        fi
 
-done
+    done
 
-case $CHOICE in
-    1)
-        Gebruikers_Toevoegen
-        ;;
-    2)
-        Gegevens_Weblinks
-        ;;
-    3)
-        while true; do
-            SUBMENU="Kies een van de volgende opties:"
-            SUBOPTIONS=(1 "MariaDB Installeren en instellen"
-                        2 "Nextcloud Installeren"
-                        3 "Wordpress Installeren"
-                        4 "Webmin Installeren"
-                        5 "Docker Installeren"
-                        6 "Back-ups Instellen"
-                        7 "Terug naar menu")
-            SUBCHOICE=$(dialog --clear \
-                               --backtitle "$BACKTITLE" \
-                               --title "Specifieke Scripts Uitvoeren" \
-                               --menu "$SUBMENU" \
-                               $HEIGHT $WIDTH $CHOICE_HEIGHT \
-                               "${SUBOPTIONS[@]}" \
-                               2>&1 >/dev/tty)
+    case $CHOICE in
+        1)
+            Gebruikers_Toevoegen
+            ;;
+        2)
+            Gegevens_Weblinks
+            ;;
+        3)
+            while true; do
+                SUBMENU="Kies een van de volgende opties:"
+                SUBOPTIONS=(1 "MariaDB Installeren en instellen"
+                            2 "Nextcloud Installeren"
+                            3 "Wordpress Installeren"
+                            4 "Webmin Installeren"
+                            5 "Docker Installeren"
+                            6 "Back-ups Instellen"
+                            7 "Terug naar menu")
+                SUBCHOICE=$(dialog --clear \
+                                --backtitle "$BACKTITLE" \
+                                --title "Specifieke Scripts Uitvoeren" \
+                                --menu "$SUBMENU" \
+                                $HEIGHT $WIDTH $CHOICE_HEIGHT \
+                                "${SUBOPTIONS[@]}" \
+                                2>&1 >/dev/tty)
 
-            if [[ $SUBCHOICE =~ ^[1-6]$ ]]; then
-                clear
-                break
-            else
-                echo "Ongeldige invoer. Voer een getal in tussen 1 en 6."
-            fi
-        done
+                if [[ $SUBCHOICE =~ ^[1-6]$ ]]; then
+                    clear
+                    break
+                else
+                    echo "Ongeldige invoer. Voer een getal in tussen 1 en 6."
+                fi
+            done
 
-        case $SUBCHOICE in
-            1)
-                echo "MariaDB instellen en configureren..."
-                Dependencies_Installeren || echo "Fout bij het installeren van dependencies"
-                MariaDB_Installeren_Configureren || echo "Fout bij het installeren van MariaDB"
-                ;;
-            2)
-                echo "Nextcloud aan het installeren..."
-                Dependencies_Installeren || echo "Fout bij het installeren van dependencies"
-                Nextcloud_Installeren || echo "Fout bij het installeren van Nextcloud"
-                ;;
-            3)
-                echo "Wordpress aan het installeren..."
-                Dependencies_Installeren || echo "Fout bij het installeren van dependencies"
-                Wordpress_Installeren || echo "Fout bij het installeren van Wordpress"
-                ;;
-            4)
-                echo "Webmin Installeren"
-                Dependencies_Installeren || echo "Fout bij het installeren van dependencies"
-                Webmin_Installeren || echo "Fout bij het installeren van Webmin"
-                ;;
-            5)
-                echo "Docker Installeren"
-                Docker_Installeren || echo "Fout bij het installeren van Docker"
-                ;;
-            6)
-                echo "Back-ups instellen..."
-                Dependencies_Installeren || echo "Fout bij het installeren van dependencies"
-                Backups_instellen || echo "Fout bij het instellen van back-ups"
-                ;;
-            7)
-                exit 0
-                ;;
-            *)
-                echo "Invalid option selected. Please try again."
-                ;;
-        esac
-        ;;
-    4)
-        echo "Eerst gaan we de schijven mounten..."
-        Schijven_Mounten || echo "Fout bij het mounten van de schijven"
-        ;;
-    5)
-        exit
-        ;;
-    *)
-        echo "Ongeldige invoer. Voer een getal in tussen 1 en 7."
-        ;;
-esac
+            case $SUBCHOICE in
+                1)
+                    echo "MariaDB instellen en configureren..."
+                    Dependencies_Installeren || echo "Fout bij het installeren van dependencies"
+                    MariaDB_Installeren_Configureren || echo "Fout bij het installeren van MariaDB"
+                    ;;
+                2)
+                    echo "Nextcloud aan het installeren..."
+                    Dependencies_Installeren || echo "Fout bij het installeren van dependencies"
+                    Nextcloud_Installeren || echo "Fout bij het installeren van Nextcloud"
+                    ;;
+                3)
+                    echo "Wordpress aan het installeren..."
+                    Dependencies_Installeren || echo "Fout bij het installeren van dependencies"
+                    Wordpress_Installeren || echo "Fout bij het installeren van Wordpress"
+                    ;;
+                4)
+                    echo "Webmin Installeren"
+                    Dependencies_Installeren || echo "Fout bij het installeren van dependencies"
+                    Webmin_Installeren || echo "Fout bij het installeren van Webmin"
+                    ;;
+                5)
+                    echo "Docker Installeren"
+                    Docker_Installeren || echo "Fout bij het installeren van Docker"
+                    ;;
+                6)
+                    echo "Back-ups instellen..."
+                    Dependencies_Installeren || echo "Fout bij het installeren van dependencies"
+                    Backups_instellen || echo "Fout bij het instellen van back-ups"
+                    ;;
+                7)
+                    exit 0
+                    ;;
+                *)
+                    echo "Invalid option selected. Please try again."
+                    ;;
+            esac
+            ;;
+        4)
+            echo "Eerst gaan we de schijven mounten..."
+            Schijven_Mounten || echo "Fout bij het mounten van de schijven"
+            ;;
+        5)
+            exit
+            ;;
+        *)
+            echo "Ongeldige invoer. Voer een getal in tussen 1 en 7."
+            ;;
+    esac
 }
 "$1"  # execute the function passed as the first argument
 Menu
