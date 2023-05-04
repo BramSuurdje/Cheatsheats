@@ -10,7 +10,7 @@ su -
 ```
 ##### download nu het script om de andere stappen automatisch te laten doen
 ```bash
-wget https://raw.githubusercontent.com/br4mSuurd/Cheatsheats/main/Linux/Scripts/script.sh
+wget https://raw.githubusercontent.com/BramSuurdje/Cheatsheats/main/Linux/Scripts/script.sh
 chmod +x script.sh
 ./script.sh
 ```
