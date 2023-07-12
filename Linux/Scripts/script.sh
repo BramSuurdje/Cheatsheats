@@ -1,504 +1,315 @@
 #!/bin/bash
-# Gemaakt door Bram Suurd
-# 134587@student.drenthecollege.nl
+# Made by Bram Suurd 
+# This script will automatically install and configure the following services. 
+# Nextcloud
+# Wordpress
+# Webmin
 
-    if [ "$USER" != "root" ]
-    then
-        echo "Voer dit uit als root"
-        exit 2
-    fi
+# This script is made for the following distributions
+# Ubuntu
+# Debian
+# CentOS
+# Fedora
+# Arch Linux
 
-    if ! command -v dialog &> /dev/null
-    then
-        echo "dialog is niet geïnstalleerd, nu installeren..."
-        apt install -y dialog > /dev/null
-    fi
+# set some colors
+CNT="[\e[1;36mNOTE\e[0m]"
+COK="[\e[1;32mOK\e[0m]"
+CER="[\e[1;31mERROR\e[0m]"
+CAT="[\e[1;37mATTENTION\e[0m]"
+CWR="[\e[1;35mWARNING\e[0m]"
+CAC="[\e[1;33mACTION\e[0m]"
+INSTLOG="install.log"
 
-function Schijven_Mounten() {
+sleep 2
 
-    if grep -q "/data" /etc/fstab; then
-        echo "Schijven_Mounten is al uitgevoerd. Skipping.."
-        sed -i '/script.sh Na_Schijven_Mounten/d' /root/.bashrc
-        return
-    fi
+echo -e "$CNT - You are about to run a script that will install and configure the following services:
+- Nextcloud
+- Wordpress
+- Backups
+- Monitoring using Webmin"
 
-    if ! command -v parted &> /dev/null
-    then
-        echo "Parted is niet geïnstalleerd, nu installeren..."
-        apt install -y parted > /dev/null
-    fi
+sleep 3
 
+read -n1 -rep $'[\e[1;33mACTION\e[0m] - Would you like to continue with the install (y,n) ' INST
+if [[ $INST == "Y" || $INST == "y" ]]; then
     clear
+    echo -e "$COK - Starting install script.."
+else
+    echo -e "$CNT - This script would now exit, no changes were made to your system."
+    exit
+fi
 
-    device1=$(lsblk -o NAME,SIZE | grep " 100G$" | awk '{print $1}')
-    if [ -z "$device1" ]; then
-        echo "Kan de 100GB-schijf niet vinden."
-        exit 1
-    fi
+sleep 3
 
-    # Find the 50GB disks
-    device2=$(lsblk -o NAME,SIZE | grep " 50G$" | awk '{print $1}' | head -n 1)
-    if [ -z "$device2" ]; then
-        echo "Kan de eerste 50GB-schijf niet vinden."
-        exit 1
-    fi
+echo -e "\n
+$CNT - This script will run some commands that require sudo. You will be prompted to enter your password.
+If you are worried about entering your password then you may want to review the content of the script."
 
-    device3=$(lsblk -o NAME,SIZE | grep " 50G$" | awk '{print $1}' | tail -n 1)
-    if [ -z "$device3" ]; then
-        echo "Kan de tweede 50GB-schijf niet vinden."
-        exit 1
-    fi
+sleep 3
 
-    mount1="/data"
-    mount2="/back"
-    mount3="/ftp"
+# check what package manager is being used
+echo -e "$CNT - Checking what package manager is being used.."
+sleep 1
+if [ -x "$(command -v apt-get)" ]; then
+    echo -e "$CNT - Using apt-get package manager"
+    PKGMGR="apt-get"
+elif [ -x "$(command -v yum)" ]; then
+    echo -e "$CNT - Using yum package manager"
+    PKGMGR="yum"
+elif [ -x "$(command -v pacman)" ]; then
+    echo -e "$CNT - Using pacman package manager"
+    PKGMGR="pacman"
+else
+    echo -e "$CER - No package manager found, exiting.."
+    exit
+fi
 
-    parted -s /dev/$device1 mklabel gpt mkpart primary ext4 0% 100%
-    parted -s /dev/$device2 mklabel gpt mkpart primary ext4 0% 100%
-    parted -s /dev/$device3 mklabel gpt mkpart primary ext4 0% 100%
-
-    mkdir -p $mount1
-    mkdir -p $mount2
-    mkdir -p $mount3
-
-    mkfs.ext4 /dev/${device1}1
-    mkfs.ext4 /dev/${device2}1
-    mkfs.ext4 /dev/${device3}1
-
+docker-install () {
     sleep 1
-
-    uuid1=$(sudo blkid -o value -s UUID /dev/${device1}1 | cut -d '"' -f 2)
-    uuid2=$(sudo blkid -o value -s UUID /dev/${device2}1 | cut -d '"' -f 2)
-    uuid3=$(sudo blkid -o value -s UUID /dev/${device3}1 | cut -d '"' -f 2)
-
-
-
-    echo "UUID=$uuid1    $mount1    ext4    defaults    0    2" | tee -a /etc/fstab
-    echo "UUID=$uuid2    $mount2    ext4    defaults    0    2" | tee -a /etc/fstab
-    echo "UUID=$uuid3    $mount3    ext4    defaults    0    2" | tee -a /etc/fstab
-
-    mount -a
-
-    echo "Start uw systeem opnieuw op om alles toe te passen. Wilt u nu opnieuw opstarten? (y/n)"
-    read answer
-
-    if [ "$answer" != "${answer#[Yy]}" ]; then
-        echo "/root/script.sh Na_Schijven_Mounten" >> /root/.bashrc
-        reboot
-        sleep 2
-    fi
-
-}
-
-
-function Dependencies_Installeren() {
-
-    if [ -f /tmp/dependencies-installed ]; then
-        echo "Dependencies zijn al geinstalleerd. Skipping..."
-        return 0
-    fi
-
-    echo "Voeg ondrej/php PPA toe en werk de package lists bij..."
-    apt-get install -y gnupg2 gnupg ca-certificates curl 
-    wget -O /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg
-    echo "deb https://packages.sury.org/php/ $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/php.list >/dev/null
-    apt update -y
-    required_packages=("apache2" "mariadb-server" "curl" "php" "libapache2-mod-php" "php-gd" "php-mysql" "php-curl" "php-mbstring" "php-intl" "php-imagick" "php-xml" "php-zip" "php-json")
-    for package in "${required_packages[@]}"; do
-        if ! dpkg -s "$package" >/dev/null 2>&1; then
-            apt-get install -y "$package"
-        fi
-    done
-
-    touch /tmp/dependencies-installed
-} 
-
-
-function MariaDB_Configureren() {
-    systemctl restart apache2
-    systemctl enable apache2.service
-
-    clear
-    echo "Wat moet het wachtwoord worden van de databases?"
-    read db_password
-
-    nextcloud_dbuser="nextcloud"
-    nextcloud_dbname="nextcloud"
-    wordpress_dbuser="wordpress"
-    wordpress_dbname="wordpress"
-
-
-    mysql -u root -p$db_password << EOF
-    ALTER USER 'root'@'localhost' IDENTIFIED BY '$db_password';
-    DELETE FROM mysql.user WHERE User='';
-    DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
-    DROP DATABASE IF EXISTS test;
-    DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
-    FLUSH PRIVILEGES;
-EOF
-
-    mysql -u root -p$db_password << EOF
-    CREATE DATABASE IF NOT EXISTS $nextcloud_dbname;
-    CREATE USER IF NOT EXISTS '$nextcloud_dbuser'@'localhost' IDENTIFIED BY '$db_password';
-    GRANT ALL PRIVILEGES ON $nextcloud_dbname.* TO '$nextcloud_dbname'@'localhost';
-    CREATE DATABASE IF NOT EXISTS $wordpress_dbname;
-    CREATE USER IF NOT EXISTS '$wordpress_dbuser'@'localhost' IDENTIFIED BY '$db_password';
-    GRANT ALL PRIVILEGES ON $wordpress_dbname.* TO '$wordpress_dbuser'@'localhost';
-    FLUSH PRIVILEGES;
-EOF
-
-    echo "Nextcloud database en user zijn aangemaakt."
-    echo "Wordpress database en user zijn aangemaakt."
-    echo "MariaDB is geconfigureerd..."	
-
-}
-
-
-function Nextcloud_Installeren() {
-    NEXTCLOUD_PATH=/var/www/html/nextcloud
-    if [ -d "$NEXTCLOUD_PATH" ]; then
-        echo "Nextcloud is al geïnstalleerd."
-        return 0
-    fi
-
-    echo "Nextcloud downloaden..."
-    if [ -e latest.tar.bz2 ]; then
-        echo "Nextcloud is al gedownload, downloaden wordt overgeslagen."
-    else
-        curl -o latest.tar.bz2 https://download.nextcloud.com/server/releases/latest.tar.bz2
-    fi
-
-    tar -xvjf latest.tar.bz2 -C "/var/www/html"
-    rm latest.tar.bz2
-    echo "Regels instellen voor de Nextcloud-directory..."
-    chown -R www-data:www-data "$NEXTCLOUD_PATH"
-    chmod -R u+rwX,g+rX,o+rX "$NEXTCLOUD_PATH"
-    chown -R www-data:www-data /data
-
-    echo "Apache virtuele host configureren voor Nextcloud..."
-    DEFAULT_CONF=/etc/apache2/sites-available/000-default.conf
-    NEXTCLOUD_CONF=/etc/apache2/sites-available/nextcloud.conf
-    cp "$DEFAULT_CONF" "$NEXTCLOUD_CONF"
-    sed -i 's/DocumentRoot \/var\/www\/html/DocumentRoot \/var\/www\/html\/nextcloud/g' "$NEXTCLOUD_CONF"
-    sed -i 's/<Directory \/var\/www\/html>/<Directory \/var\/www\/html\/nextcloud>/g' "$NEXTCLOUD_CONF"
-    a2ensite nextcloud.conf
-    a2enmod rewrite
-
-    if [ $? -eq 0 ]; then
-        echo "Nextcloud is geïnstalleerd."
-    else
-        echo "Er is iets fout gegaan bij het configureren van Apache voor Nextcloud."
-    fi
-}
-
-
-function Wordpress_Installeren() {
-    echo "Wordpress downloaden..."
-    if [ -e /tmp/latest.tar.gz ]; then
-        echo "Wordpress is al gedownload, downloaden wordt overgeslagen"
-    else
-        if ! curl -o /tmp/latest.tar.gz https://wordpress.org/latest.tar.gz; then
-            echo "Fout bij het downloaden van Wordpress"
-            exit 1
-        fi
-    fi
-    
-    if ! tar -xzf /tmp/latest.tar.gz -C /var/www/html/; then
-        echo "Fout bij het uitpakken van Wordpress"
-        exit 1
-    fi
-
-    chown -R www-data:www-data /var/www/html/wordpress
-    chmod -R u=rwX,g=rX,o=rX /var/www/html/wordpress
-    find /var/www/html/wordpress -type d -exec chmod g+s {} +
-
-    echo "Apache virtuele host configureren voor Wordpress..."
-    cp /etc/apache2/sites-available/nextcloud.conf /etc/apache2/sites-available/wordpress.conf
-    sed -i 's/ServerName/ServerAlias/g; s/nextcloud/wordpress/g; s#/var/www/nextcloud#/var/www/html/wordpress#g; s/www-data/wordpress/g' /etc/apache2/sites-available/wordpress.conf
-    a2ensite wordpress.conf
-
-    echo "Apache herstarten..."
-    if ! systemctl restart apache2; then
-        echo "Fout bij het herstarten van Apache"
-        exit 1
-    fi
-} 
-
-
-function Backups_instellen() {
-    set -e
-
-    BACKUP_DIR=/back/backups
-
-    if [ ! -d "$BACKUP_DIR" ]; then
-        mkdir -p "$BACKUP_DIR"
-    fi
-
-    rsync -avr --delete /data "$BACKUP_DIR"
-
-    if [ "$?" -eq 0 ]; then
-        (crontab -l ; echo "0 0 * * * /usr/bin/rsync -avr --delete /data $BACKUP_DIR") | crontab -
-    else
-        echo "Error: rsync command failed."
-    fi
-} 
-
-
-function Webmin_Installeren() {
-    set -e
-
-    REPO_URL="deb https://download.webmin.com/download/repository sarge contrib"
-    GPG_KEY_URL="https://www.webmin.com/jcameron-key.asc"
-
-    apt-get update
-    apt-get install -y wget gnupg
-    wget -q "$GPG_KEY_URL" -O- | apt-key add -
-    echo "$REPO_URL" | tee -a /etc/apt/sources.list
-    apt-get update
-    apt-get install -y webmin
-} 
-
-
-function Docker_Installeren() {
-    apt-get update -y
-    apt-get install ca-certificates curl gnupg -y
-    mkdir -m 0755 -p /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-    echo \
-    "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
-    "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
-    tee /etc/apt/sources.list.d/docker.list > /dev/null
-    apt-get update -y
-    apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
-}
-
-
-function Post_Install() {
-    set -e
-    mkdir -p /data/gegevens
-    clear
-
-    WEBMIN_PORT=10000
-    SERVER_IP=$(hostname -I | awk '{print $1}')
-    NEXTCLOUD_URL="http://${SERVER_IP}/nextcloud/"
-    WEBMIN_URL="https://${SERVER_IP}:${WEBMIN_PORT}/"
-    WORDPRESS_URL="http://${SERVER_IP}/wordpress/"
-
-    { 
-    echo "Hierbij alle web-interfaces:"
-    echo "Nextcloud URL: $NEXTCLOUD_URL"
-    echo "Webmin URL: $WEBMIN_URL"
-    echo "WordPress URL: $WORDPRESS_URL"
-    echo " "
-    echo "Nextcloud DataDirectory: /data"
-    echo "Nextcloud gebruikersnaam: $nextcloud_dbuser"
-    echo "Nextcloud wachtwoord: $db_password"
-    echo "Nextcloud database: $nextcloud_dbname"
-    echo "Nextcloud DatabaseServer: Localhost"
-    echo " "
-    echo "Wordpress database: $wordpress_dbname"
-    echo "Wordpress gebruikersnaam: $wordpress_dbuser"
-    echo "Wordpress wachtwoord: $db_password"
-    echo "Wordpress DatabaseServer: Localhost"
-    } |& tee -a /data/gegevens/wachtwoorden.txt
-
-}
-
-function Gegevens_Weblinks() {
-    Weblinks_Path="/data/gegevens/wachtwoorden.txt"
-
-    if [ -f "$Weblinks_Path" ]; then
-    cat "$Weblinks_Path"
-    else
-        echo ""
-    fi
-}
-
-function Na_Schijven_Mounten() {
-    echo "Dependencies aan het installeren..."
-    Dependencies_Installeren || echo "Fout bij het installeren van dependencies"
-    echo "MariaDB aan het Configureren..."
-    MariaDB_Configureren || echo "Fout bij het configureren van Mariadb"
-    echo "Nextcloud aan het installeren..."
-    Nextcloud_Installeren || echo "Fout bij het installeren van Nextcloud"
-    echo "Wordpress aan het installeren..."
-    Wordpress_Installeren || echo "Fout bij het installeren van Wordpress"
-    echo "Webmin aan het installeren..."
-    Webmin_Installeren || echo "Fout bij het installeren van Webmin"
-    echo "Back-ups instellen..."
-    Backups_instellen || echo "Fout bij het instellen van back-ups"
-    Post_Install
-}
-
-function Gebruikers_Toevoegen() {
-
-    -u www-data php /var/www/html/nextcloud/occ config:system:set default_language --value="nl"
-
-    printf "Voer de naam van de nieuwe gebruiker in: "
-    read gebruikersnaam
-
-    printf "Voer het personeelsnummer in: "
-    read gebruikersnummer
-
-    printf "Voer de juiste afdeling in:\n"
-    printf "1. Administratie\n"
-    printf "2. Directie\n"
-    printf "3. Verkoop\n"
-    read -p "Afdeling: " groep_nummer
-
-    case $groep_nummer in
-        1) groep="Administratie" ;;
-        2) groep="Directie" ;;
-        3) groep="Verkoop" ;;
-        *) echo "Ongeldig afdelingsnummer" && return ;;
-    esac
-
-    if id -u "$gebruikersnaam" >/dev/null 2>&1; then
-        printf "Gebruiker %s bestaat al\n" "$gebruikersnaam"
-        return
-    fi
-
-    if getent group "$groep" >/dev/null 2>&1; then
-        printf "Groep %s bestaat al\n" "$groep"
-    else
-        printf "Groep aanmaken %s\n" "$groep"
-        groupadd "$groep"
-        -u www-data php /var/www/html/nextcloud/occ group:add "$groep"
-    fi
-    
-    if ! command -v pwgen &> /dev/null
-    then
-        echo "pwgen is niet geinstalleerd, nu installeren..."
-        apt install pwgen -y
-    else
-        echo ""
-    fi
-
-    password=$(pwgen -1cnsy 16)
-    hashed_password=$(openssl passwd -1 "$password")
-
-    useradd -m -d "/home/$ge" -s /bin/bash -p "$hashed_password" "$ge"
-    usermod -aG "$groep" "$ge"
-    export OC_PASS=$password
-    su -s /bin/sh www-data -c "php /var/www/html/nextcloud/occ user:add --password-from-env --display-name=\"$gebruikersnaam\" --group=\"$groep\" \"$ge\""
-
-    mkdir -p /data/user-accounts && printf "Gebruiker %s is aangemaakt met gebruikersnaam %s, wachtwoord %s, en toegevoegd aan de groep %s\n, het watchwoord voor nextcloud is 'wachtwoord123'" "$gebruikersnaam" "$ge" "$password" "$groep"  | tee -a /data/user-accounts/$ge-Wachtwoord.txt
-} 
-
-function Menu() {
-    HEIGHT=15
-    WIDTH=60
-    CHOICE_HEIGHT=6
-    BACKTITLE="Linux Project"
-    TITLE="Linux Drenthecollege"
-    MENU="Kies een van de volgende opties:"
-
-    OPTIONS=(1 "Gebruikers Toevoegen"
-            2 "Alle web links laten zien"
-            3 "Specifieke Scripts uitvoeren"
-            4 "Compleet script runnen"
-            5 "Exit")
-
-    while true; do
-        CHOICE=$(dialog --clear \
-                        --backtitle "$BACKTITLE" \
-                        --title "$TITLE" \
-                        --menu "$MENU" \
-                        $HEIGHT $WIDTH $CHOICE_HEIGHT \
-                        "${OPTIONS[@]}" \
-                        2>&1 >/dev/tty)
-
-        if [[ $CHOICE =~ ^[1-5]$ ]]; then
-            clear
-            break
+    # install docker and docker-compose
+        echo -e "$COK - Installing docker.."
+        # update the system based on the package manager
+        if [[ $PKGMGR == "apt-get" ]]; then
+            sudo apt-get update -y
+            sudo apt-get upgrade -y
+            sudo apt-get install -y apt-transport-https ca-certificates curl gnupg-agent software-properties-common
+            if [[ $(lsb_release -is) == "Ubuntu" ]]; then
+                curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+                echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+            elif [[ $(lsb_release -is) == "Debian" ]]; then
+                curl -fsSL https://download.docker.com/linux/debian/gpg | sudo apt-key add -
+                sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/debian $(lsb_release -cs) stable"
+            else
+                echo -e "$CER - Unsupported distribution: $(lsb_release -is), exiting.."
+                exit
+            fi
+            sudo apt-get update -y
+            sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose
+            sudo usermod -aG docker $USER
+            # check if docker was installed successfully
+            if [[ $(docker --version) == *"Docker"* ]]; then
+                echo -e "$COK - Docker installed successfully"
+            else
+                echo -e "$CER - Docker failed to install, exiting.."
+                exit
+            fi
+        elif [[ $PKGMGR == "yum" ]]; then
+            sudo yum update -y
+            sudo yum install -y yum-utils device-mapper-persistent-data lvm2
+            sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+            sudo yum install -y docker-ce docker-ce-cli containerd.io docker-compose
+            sudo systemctl start docker
+            sudo systemctl enable docker
+            sudo usermod -aG docker $USER
+            # check if docker was installed successfully
+            if [[ $(docker --version) == *"Docker"* ]]; then
+                echo -e "$COK - Docker installed successfully"
+            else
+                echo -e "$CER - Docker failed to install, exiting.."
+                exit
+            fi
+        elif [[ $PKGMGR == "pacman" ]]; then
+            sudo pacman -Syu --noconfirm
+            sudo pacman -S --noconfirm docker docker-compose
+            sudo systemctl start docker
+            sudo systemctl enable docker
+            sudo usermod -aG docker $USER
+            # check if docker was installed successfully
+            if [[ $(docker --version) == *"Docker"* ]]; then
+                echo -e "$COK - Docker installed successfully"
+            else
+                echo -e "$CER - Docker failed to install, exiting.."
+                exit
+            fi
         else
-            echo "Ongeldige invoer. Voer een getal in tussen 1 en 6."
-        fi
-
-    done
-
-    case $CHOICE in
-        1)
-            Gebruikers_Toevoegen
-            ;;
-        2)
-            Gegevens_Weblinks
-            ;;
-        3)
-            while true; do
-                SUBMENU="Kies een van de volgende opties:"
-                SUBOPTIONS=(1 "MariaDB Installeren en instellen"
-                            2 "Nextcloud Installeren"
-                            3 "Wordpress Installeren"
-                            4 "Webmin Installeren"
-                            5 "Docker Installeren"
-                            6 "Back-ups Instellen"
-                            7 "Terug naar menu")
-                SUBCHOICE=$(dialog --clear \
-                                --backtitle "$BACKTITLE" \
-                                --title "Specifieke Scripts Uitvoeren" \
-                                --menu "$SUBMENU" \
-                                $HEIGHT $WIDTH $CHOICE_HEIGHT \
-                                "${SUBOPTIONS[@]}" \
-                                2>&1 >/dev/tty)
-
-                if [[ $SUBCHOICE =~ ^[1-6]$ ]]; then
-                    clear
-                    break
-                else
-                    echo "Ongeldige invoer. Voer een getal in tussen 1 en 6."
-                fi
-            done
-
-            case $SUBCHOICE in
-                1)
-                    echo "MariaDB instellen en configureren..."
-                    Dependencies_Installeren || echo "Fout bij het installeren van dependencies"
-                    MariaDB_Installeren_Configureren || echo "Fout bij het installeren van MariaDB"
-                    ;;
-                2)
-                    echo "Nextcloud aan het installeren..."
-                    Dependencies_Installeren || echo "Fout bij het installeren van dependencies"
-                    Nextcloud_Installeren || echo "Fout bij het installeren van Nextcloud"
-                    ;;
-                3)
-                    echo "Wordpress aan het installeren..."
-                    Dependencies_Installeren || echo "Fout bij het installeren van dependencies"
-                    Wordpress_Installeren || echo "Fout bij het installeren van Wordpress"
-                    ;;
-                4)
-                    echo "Webmin Installeren"
-                    Dependencies_Installeren || echo "Fout bij het installeren van dependencies"
-                    Webmin_Installeren || echo "Fout bij het installeren van Webmin"
-                    ;;
-                5)
-                    echo "Docker Installeren"
-                    Docker_Installeren || echo "Fout bij het installeren van Docker"
-                    ;;
-                6)
-                    echo "Back-ups instellen..."
-                    Dependencies_Installeren || echo "Fout bij het installeren van dependencies"
-                    Backups_instellen || echo "Fout bij het instellen van back-ups"
-                    ;;
-                7)
-                    exit 0
-                    ;;
-                *)
-                    echo "Invalid option selected. Please try again."
-                    ;;
-            esac
-            ;;
-        4)
-            echo "Eerst gaan we de schijven mounten..."
-            Schijven_Mounten || echo "Fout bij het mounten van de schijven"
-            ;;
-        5)
+            echo -e "$CER - No package manager found, exiting.."
             exit
-            ;;
-        *)
-            echo "Ongeldige invoer. Voer een getal in tussen 1 en 7."
-            ;;
-    esac
+        fi
 }
-"$1"  # execute the function passed as the first argument
-Menu
+
+nextcloud-install () {
+    sleep 1
+    sudo docker-compose -p nextcloud -f dc-nextcloud.yml up -d
+    #check if nextcloud is running
+    if [[ $(sudo docker ps -a) == *"nextcloud"* ]]; then
+        NEXTCLOUDIP=$(ip addr show eth0 | grep "inet\b" | awk '{print $2}' | cut -d/ -f1)
+        NEXTCLOUDURL="http://$NEXTCLOUDIP:81"
+        echo -e "$COK - Nextcloud installed successfully"
+        echo ""
+        sleep 2
+        echo -e "$CNT - Nextcloud URL details:"
+        echo -e "$CNT - Nextcloud URL is: $NEXTCLOUDURL"
+
+    else
+        echo -e "$CER - Nextcloud failed to install, trying to start the container again.."
+        # try to start nextcloud again
+        sudo docker-compose -p nextcloud -f dc-nextcloud.yml up -d
+        #check if nextcloud is running
+        if [[ $(sudo docker ps -a) == *"nextcloud"* ]]; then
+            NEXTCLOUDIP=$(hostname -I | awk '{print $1}')
+            NEXTCLOUDURL="http://$NEXTCLOUDIP:81"
+            echo -e "$COK - Nextcloud installed successfully"
+            echo ""
+            sleep 2
+            echo -e "$CNT - Nextcloud URL details:"
+            echo -e "$CNT - Nextcloud URL is: $NEXTCLOUDURL"
+        else
+            echo -e "$CER - Nextcloud failed to install or start, exiting.."
+            exit
+        fi
+    fi
+}
+
+
+wordpress-install () {
+    sleep 1
+    sudo docker-compose -p wordpress -f dc-wordpress.yml up -d
+    #check if wordpress is running
+    if [[ $(sudo docker ps -a) == *"wordpress"* ]]; then
+        WORDPRESSIP=$(hostname -I | awk '{print $1}')
+        WORDPRESSURL="http://$WORDPRESSIP:80"
+        echo -e "$COK - Wordpress installed successfully"
+        sleep 2
+        echo ""
+        echo -e "$CNT - Wordpress URL details:"
+        echo -e "$CNT - Wordpress URL is: $WORDPRESSURL"
+
+    else
+        echo -e "$CER - Wordpress failed to install, trying to start the container again.."
+        # try to start wordpress again
+        sudo docker-compose -p wordpress -f dc-wordpress.yml up -d
+        #check if wordpress is running
+        if [[ $(sudo docker ps -a) == *"wordpress"* ]]; then
+            echo -e "$COK - Wordpress installed successfully"
+            WORDPRESSIP=$(hostname -I | awk '{print $1}')
+            WORDPRESSURL="http://$WORDPRESSIP:80"
+            sleep 2
+            echo ""
+            echo -e "$CNT - Wordpress URL details:"
+            echo -e "$CNT - Wordpress URL is: $WORDPRESSURL"
+        else
+            echo -e "$CER - Wordpress failed to install or start, exiting.."
+            exit
+        fi
+    fi
+}
+
+
+portainer-install () {
+    sleep 1
+    sudo docker volume create portainer_data
+    sudo docker run -d -p 8000:8000 -p 9443:9443 --name portainer --restart=always -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce:latest
+    #check if portainer is running
+    if [[ $(sudo docker ps -a) == *"portainer"* ]]; then
+        PORTAINERIP=$(hostname -I | awk '{print $1}')
+        PORTAINERURL="https://$PORTAINERIP:9443"
+        echo -e "$COK - Portainer installed successfully"
+        sleep 2
+        echo ""
+        echo -e "$CNT - Portainer URL is: $PORTAINERURL"
+
+    else
+        echo -e "$CER - Portainer failed to install, trying to start the container again.."
+        # try to start portainer again
+        sudo docker run -d -p 8000:8000 -p 9443:9443 --name portainer --restart=always -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce:latest
+        #check if portainer is running
+        if [[ $(sudo docker ps -a) == *"portainer"* ]]; then
+            echo -e "$COK - Portainer installed successfully"
+            PORTAINERIP=$(hostname -I | awk '{print $1}')
+            PORTAINERURL="https://$PORTAINERIP:9443"
+            echo ""
+            echo -e "$CNT - Portainer URL is: $PORTAINERURL"
+        else
+            echo -e "$CER - Portainer failed to install or start, exiting.."
+            exit
+        fi
+    fi
+}
+
+
+webmin-install () {
+    sleep 1
+    curl -o setup-repos.sh https://raw.githubusercontent.com/webmin/webmin/master/setup-repos.sh
+    sh setup-repos.sh
+}
+
+sleep 1
+# Nextcloud install
+clear
+echo -e "$CNT - Nextcloud is a platform to create your own cloud storage"
+sleep 2
+read -n1 -rep $'[\e[1;33mACTION\e[0m] - Would you like to install nextcloud (y,n) ' INSTNC
+if [[ $INSTNC == "Y" || $INSTNC == "y" ]]; then
+    echo -e "$CNT - Installing nextcloud using docker"
+    # check if docker is installed
+    if [[ $(docker --version) == *"Docker"* ]]; then
+        echo -e "$CNT - Docker is installed... Continuing"
+        nextcloud-install
+    else
+        echo -e "$CER - Docker is not installed"
+        sleep 1
+        echo -e "$CNT - Installing docker and continuing"
+        docker-install
+        nextcloud-install
+    fi
+else
+    echo -e "$CNT - Skipping nextcloud install"
+fi
+
+
+# Wordpress install
+clear
+echo -e "$CNT - Wordpress is a platform to create websites and blogs"
+sleep 2
+read -n1 -rep $'[\e[1;33mACTION\e[0m] - Would you like to install wordpress (y,n) ' INSTWP
+if [[ $INSTWP == "Y" || $INSTWP == "y" ]]; then
+    echo -e "$CNT - Installing wordpress using docker"
+    # check if docker is installed
+    if [[ $(docker --version) == *"Docker"* ]]; then
+        echo -e "$CNT - Docker is installed... Continuing"
+        wordpress-install
+    else
+        echo -e "$CER - Docker is not installed"
+        sleep 1
+        echo -e "$CNT - Installing docker and continuing"
+        docker-install
+        wordpress-install
+    fi
+else
+    echo -e "$CNT - Skipping wordpress install"
+fi
+
+# Portainer install
+clear
+echo -e "$CNT - Portainer is a docker management tool to manage your docker containers"
+sleep 2
+read -n1 -rep $'[\e[1;33mACTION\e[0m] - Would you like to install portainer (y,n) ' INSTPORT
+if [[ $INSTPORT == "Y" || $INSTPORT == "y" ]]; then
+    echo -e "$CNT - Installing portainer using docker"
+    # check if docker is installed
+    if [[ $(docker --version) == *"Docker"* ]]; then
+        echo -e "$CNT - Docker is installed... Continuing"
+        portainer-install
+    else
+        echo -e "$CER - Docker is not installed"
+        sleep 1
+        echo -e "$CNT - Installing docker and continuing"
+        docker-install
+        portainer-install
+    fi
+else
+    echo -e "$CNT - Skipping portainer install"
+fi
+
+# Webmin install
+clear
+echo -e "$CNT - Webmin is a web-based interface for system administration for Unix"
+echo -e "$CNT - Webmin is only available for RHEL and Debian based systems"
+sleep 2
+read -n1 -rep $'[\e[1;33mACTION\e[0m] - Would you like to install webmin (y,n) ' INSTWEBMIN
+if [[ $INSTWEBMIN == "Y" || $INSTWEBMIN == "y" ]]; then
+    webmin-install
+else
+    echo -e "$CNT - Skipping webmin install"
+fi
